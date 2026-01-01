@@ -1,18 +1,70 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  id: serial("id").primaryKey(),
+  tgId: text("tg_id").notNull().unique(), // Telegram ID as string to be safe
+  username: text("username"),
+  lang: text("lang").default("UA"),
+  tier: text("tier").default("FREE"),
+  requestsLeft: integer("requests_left").default(15),
+  streakDays: integer("streak_days").default(0),
+  refCode: text("ref_code").unique(),
+  discountPct: integer("discount_pct").default(0),
+  blocked: boolean("blocked").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const reports = pgTable("reports", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  objectType: text("object_type").notNull(),
+  dataJson: jsonb("data_json"),
+  pdfPath: text("pdf_path"),
+  generatedAt: timestamp("generated_at").defaultNow(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const watches = pgTable("watches", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  objectType: text("object_type").notNull(),
+  value: text("value").notNull(),
+  thresholdsJson: jsonb("thresholds_json"),
+  status: text("status").default("low"),
+  lastCheck: timestamp("last_check"),
+  alertsOn: boolean("alerts_on").default(true),
+});
+
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  tier: text("tier").notNull(),
+  amountUsdt: decimal("amount_usdt").notNull(),
+  txHash: text("tx_hash"),
+  screenshotUrl: text("screenshot_url"),
+  status: text("status").default("pending"), // pending, approved, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: integer("referrer_id").references(() => users.id),
+  referredId: integer("referred_id").references(() => users.id),
+  paid: boolean("paid").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod Schemas
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertReportSchema = createInsertSchema(reports).omit({ id: true, generatedAt: true });
+export const insertWatchSchema = createInsertSchema(watches).omit({ id: true, lastCheck: true });
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
+export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true });
+
+// Types
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Report = typeof reports.$inferSelect;
+export type Watch = typeof watches.$inferSelect;
+export type Payment = typeof payments.$inferSelect;
