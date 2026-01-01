@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  tgId: text("tg_id").notNull().unique(), // Telegram ID as string to be safe
+  tgId: text("tg_id").notNull().unique(),
   username: text("username"),
   lang: text("lang").default("UA"),
   tier: text("tier").default("FREE"),
@@ -13,6 +13,10 @@ export const users = pgTable("users", {
   refCode: text("ref_code").unique(),
   discountPct: integer("discount_pct").default(0),
   blocked: boolean("blocked").default(false),
+  theme: text("theme").default("dark"),
+  notifsOn: boolean("notifs_on").default(true),
+  digestsOn: boolean("digests_on").default(true),
+  lastLogin: timestamp("last_login").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -43,7 +47,7 @@ export const payments = pgTable("payments", {
   amountUsdt: decimal("amount_usdt").notNull(),
   txHash: text("tx_hash"),
   screenshotUrl: text("screenshot_url"),
-  status: text("status").default("pending"), // pending, approved, rejected
+  status: text("status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -55,12 +59,20 @@ export const referrals = pgTable("referrals", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  type: text("type").notNull(), // e.g., 'risk_hunter', 'scam_slayer'
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+});
+
 // Zod Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertReportSchema = createInsertSchema(reports).omit({ id: true, generatedAt: true });
 export const insertWatchSchema = createInsertSchema(watches).omit({ id: true, lastCheck: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true });
+export const insertAchievementSchema = createInsertSchema(achievements).omit({ id: true, unlockedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -68,3 +80,4 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Report = typeof reports.$inferSelect;
 export type Watch = typeof watches.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type Achievement = typeof achievements.$inferSelect;
