@@ -1,0 +1,260 @@
+🔒 DARKSHARE v4.0 — ПОВНЕ ФУНКЦІОНАЛЬНЕ ТА ТЕХНІЧНЕ ЗАВДАННЯ ДЛЯ РОЗРОБКИ TELEGRAM-БОТА (ФОКУС НА ЛОГІЦІ ВІДПОВІДЕЙ, PDF, МОНІТОРИНГУ ТА ІНШОГО, БЕЗ AI ТА САЙТУ)
+Бро, ось максимально детальний опис для розробки логіки бота DARKSHARE v4.0. Я зосередився на ключових частинах, які ти згадував: логіка відповідей (results from modules), PDF-звіти (generation, view, share), моніторинг (add, alerts, digests), а також "і так далі" — тобто повний flow для користувача (включаючи груповий режим, реферали, оплати, гейміфікацію), адмін-панель і модератор-панель в TG. Без будь-яких згадок AI (predictive, anomaly etc.), без веб-сайту/dashboard — чисто TG-бот. Все легальне: public data, consent, GDPR (no storage, anon logs).
+Я розділив на погляд користувача (User View: як виглядає flow, повідомлення, кнопки від юзера/адміна) і погляд розробника (Dev View: код, БД, edge cases, інтеграції). Деталі до хуйових дрібниць: кожен крок, кожен клік, errors, visuals. Для візуалів PDF і кнопок — рендери з пошуку (приклади enterprise PDF і TG interfaces).
+Дата: 01 січня 2026 (враховано тренди 2025-2026: IoT/cloud checks, real-time monitoring без AI, blockchain verify). Бот на Python/aiogram, scalable для 100k+ юзерів, MRR 50k+ USD.
+1. Погляд Користувача (User View: UX Flows з Дрібницями)
+Від юзера — бот виглядає як темний, мінімалістичний інтерфейс з емодзі, короткими текстами (max 150 chars/msg), швидкими кнопками (inline для дій, reply для nav). Dark theme default, switch in settings. Голосовий input для data. Errors: Friendly з hints. Персоналізація: Top buttons by usage history (e.g., часто wallets — 💰 нагорі). Gamification: Streaks (+free req за daily login), badges ("Risk Hunter" за 10 checks). Реферали: -20% discount за 5 paid refs, 20% commish.
+1.1 Загальний Flow Бота (Старт, Дашборд, Модулі)
+
+Старт (/start):textДоброго, @username! 👋 DARKSHARE v4.0 — твій щит від ризиків. Join 100k+ юзерів!
+Обери мову: (auto: UA)Кнопки: 🇺🇦 UA / 🇬🇧 EN / 🇷🇺 RU (inline, click → save lang, show tutorial video embed 30 sec: "Встав data → confirm → get results. Upgrade для PDF/monitor.").
+Після: "Tutorial done! Go to dashboard." + button [🚀 Start].
+Дрібниці: Якщо ref в URL — "Вітаю від @friend! +1 free req. Your ref-code: DARK-ABC123." Streak start: "Day 1: Login bonus +1 req!"
+Дашборд (після /start або /menu):text🌑 DARKSHARE Dashboard
+Запитів: 12/15 (FREE). Streak: 3 дні (+bonus req!). Refs: 2/5 для -20% off.
+Total users: 100k+. Daily tip: Check IP на blacklists!
+Обери модуль або дію:Кнопки (inline 3-4/ряд, 🔒 для premium; reply bottom: [⬅️ Back to Start], [❓ Help with Video], [🚪 Delete My Data - GDPR]):
+🌐 IP/GEO/Network (click → prompt "Enter IP:" + voice hint).
+🔑 API/Tokens/Secrets (баланс для Binance etc. якщо key provided).
+📱 Phone/VOIP (VOIP/disposable flags).
+📧 Email/Leaks (breaches check).
+🏢 Business/Domain (age/SSL/sanctions).
+💰 Blockchain/Wallets/Contracts (tx history, balance breakdown: ETH 1.5, USDT 1000).
+📱 Social Handles/Profiles (age/bans/cross-check).
+🛡️ CVE/Vulns Scan 🔒 (severity match).
+📡 IoT/Device Fingerprint 🔒 (OS/spoofing).
+☁️ Cloud Resources 🔒 (config exposures).
+🔗 URL/Link Risk (phishing/malware).
+📄 Reports (list previous PDF з dates, click to download).
+👁 Monitoring (watchlist view: "Wallet 0x123: Active, last check: 🟢").
+📊 History/Timeline (list changes: "IP changed to blacklist: 01.01.2026").
+⚙️ Settings (lang, theme, notifs: push/digests on/off, 2FA setup).
+💳 Subscription (tiers list з prices/discounts from refs/coupons).
+📣 Refer Friends (your link/code, share button).
+🎁 Enter Coupon (input field: "Code: DARK20 → -20% applied!").
+🎮 Achievements (badges list: "Claim 'Scam Slayer' +2 req!").
+Дрібниці: Low requests — red warning "3 left! Upgrade?" + upsell button. Daily popup if no login: "Streak break? Login now for bonus!"
+
+Модулі (Приклад: Blockchain/Wallet Response Logic):
+Flow: Button click → "Enter wallet address:" (text/voice input) → consent msg "Це твої дані? Не зберігаємо, тільки check via public APIs (Etherscan etc.)." + buttons ✅ Confirm / ❌ Cancel.
+Loading: "Checking... (1-2 sec spinner)".
+Response вигляд:textРезультат Blockchain/Wallet: 0x123... (01.01.2026 12:00 UTC, Sources: Etherscan, Chainalysis open)
+🟢 Low risk
+Деталі:
+- Tx history: 150 tx, last 1 day ago, volume 2 ETH.
+- Flags: No mixer/laundering/scam (blacklists clean).
+- Balance: 1.5 ETH (~$4500 at current rate), Tokens: 1000 USDT, 50 DAI.
+- Smart Contract: No vulns in public code.
+Recommends: Rotate keys every 90 days, enable 2FA.Кнопки (inline under msg, green for safe, red for risk):
+🔄 Re-Check (repeat input).
+📄 Generate PDF (async gen, send file: "report_01.01.2026.pdf" з download button).
+👁 Add to Monitoring (add to watchlist prompt: "Set alert threshold? E.g., tx >10/day").
+⚠️ Share Result (forward msg з your ref-link embed).
+📊 View History (timeline for this object).
+⬅️ Back to Dashboard.
+Дрібниці: High risk — bold 🔴 + warning sound (TG notification). Invalid input — "Not a valid address. Example: 0x... Try again?" + retry button. Premium: Extra details (e.g., sanctions check).
+
+Інші Модулі (Коротко з Дрібницями):
+IP/GEO: Response "🟡 Medium risk. ASN: 12345, Provider: ISP, GEO: Ukraine/Kyiv, Blacklist: AbuseIPDB score 45/100." Buttons same.
+API/Tokens: "🟢 Valid. Permissions: read, Balance (Binance): 700 USDT (BTC: 0.05)." Consent for key: "Provide read-only key? No store."
+Phone/Email: "🔴 High risk. VOIP: Yes, Leaks: 3 breaches (HaveIBeenPwned). abusive reports: High."
+Business/Domain: "🟡 Offshore reg, Age: 5 years, SSL: Valid, Sanctions: No (OFAC)."
+Social: "🟢 Clean. Age: 2 years, No bans, Cross: LinkedIn clean."
+CVE: "🔴 High severity match CVE-2025-1234. Remediation: Update software."
+IoT/Device: "🟢 No spoofing. OS: Windows, Browser: Chrome, Malware: No sigs."
+Cloud: "🟡 Open bucket found (AWS). Recommend: Set private."
+URL: "🔴 Phishing detected (VirusTotal). Redirects: 2 to suspicious domain."
+Загальні дрібниці: Results structured blocks з emojis/flags. Sources listed for trust. Share button adds "Checked by DARKSHARE - Join via my ref!"
+
+
+1.2 PDF-Звіти (Logic from User Side)
+
+Flow: З results button [📄 Generate PDF] → "Generating... (2-5 sec)" → send file "report_id.pdf" + msg "PDF ready! Structure: Header (date/input), Analysis (blocks/flags/balance), Timeline (changes list), Verdict (🟢 Low risk score 20/100), Recommends (actionable list), Sig (SHA256 hash), QR (for verify tx if blockchain), Watermark 'CONFIDENTIAL'."
+Вигляд in TG: File attach з caption "Download or share. Printable A4, dark theme, charts (risk graph via lines/bars)."
+Кнопки under file:
+📥 Download Again (resend file).
+⚠️ Share PDF (forward file з ref-link in caption).
+👁 View in TG (TG built-in PDF viewer).
+📄 Bulk Gen (for multiple objects, premium: "Select 3 wallets → gen one PDF").
+⬅️ Back.
+
+Дрібниці: Free: Teaser PDF "Watermarked demo, upgrade for full." Bulk: "Generated 5 reports in ZIP." Error: "Too large input? Try single." Share adds "Confidential - Do not distribute without consent."
+Mockup PDF: Приклад вигляду звіту (dark theme, blocks, chart, QR bottom, watermark diagonal, sig bottom):
+
+1.3 Моніторинг (Logic from User Side)
+
+Flow: З results [👁 Add to Monitoring] → prompt "Object: Wallet 0x123. Set thresholds? E.g., 'Alert if abuse score >50' or 'Daily digest'." + buttons ✅ Add / Edit Thresholds / Cancel.
+Add success: "Added! Checks every 5 min (premium: 1 min). Current status: 🟢."
+Watchlist View (from dashboard [👁 Monitoring]):textYour Watchlist (3 objects):
+1. IP 192.168.1.1: 🟢 Low, last check 12:05.
+2. Wallet 0x123: 🟡 Medium, balance changed -10%.
+3. URL example.com: 🔴 High, new phishing flag.Кнопки per object: [Details] (full response), [Edit Thresholds] (input "tx >10/day or balance drop >20%"), [Remove], [Pause Alerts].
+Alerts (Push Logic): Real-time push: "🚨 Alert: Wallet 0x123 anomaly - high tx velocity! Status: 🔴 Check now." + buttons [Details] / [Ignore] / [Snooze 1h].
+Дрібниці: Custom: "Push only high risk." Digests: Daily msg "Digest 01.01.2026: 2 changes (IP blacklist added, wallet balance +5%)." + on/off in settings. Group mode: Alerts in group if shared watchlist.
+Дрібниці: Free: 1 object max, 1h checks. Premium: Unlimited, 5min checks, SIEM export (webhook button). Error: "Threshold invalid? Example: score >50." Pause all: From settings.
+
+1.4 Адмін/Модератор Панель (User View for Admins/Mods in TG)
+
+Access: /admin for super-admins, /mod for mods (check user_id in config).
+Адмін Панель Flow: Msg "ADMIN PANEL 🌑 Real stats: Total users 47312, MRR $38420."
+Кнопки (inline grouped):
+👥 Users (list/search: "@user: FREE, req 12, refs 2" + buttons [Edit Tier] [Block] [Add Credits] [Send Msg]).
+🛡️ Mods (add/remove mod_ids: "Add @mod1" input).
+💰 Tiers (edit prices: "STANDARD: 5 USDT" input new).
+📢 Broadcast (input text/media, target "All/Free/Paid", schedule "Daily 12:00" + A/B variants button, send preview + [Confirm Send]).
+🎁 Coupons (gen: "Code DARK20, -20%, expiry 30 days, uses 100" + list active/revoke).
+📣 Referrals (top referrers list, payout: "Send 2 USDT to @user wallet" confirm).
+⚙️ Modules (toggle on/off per module: "Disable CVE? Yes/No").
+📝 Content (edit texts: "Change daily tip: input new").
+📊 Analytics (real DAU 9214, MAU 34112, churn 7.8%, MRR breakdown table + [Export CSV]).
+🚨 Emergency (kill-switch: "Pause all monitoring? Yes" + log).
+⬅️ Exit Admin.
+Дрібниці: Stats update button [Refresh]. Search users by @ or ID. Broadcast preview: "Test send to self."
+
+Модератор Панель Flow: Подібно, але обмежено: "MOD DASHBOARD. Pending payments: 18."
+Кнопки: 🧾 Payments (list "User @u, PRO 10 USDT, tx_hash/photo" + ✅ Approve / ❌ Reject + reason input), 📢 Create Ad (text/buttons/schedule/target), 🎁 Gen Coupon, 📣 Ref Stats, 📊 Quick Stats, ⬅️ Back.
+Дрібниці: Approve → auto update user tier, notify "Subscription active! 🎉" Reject → notify "Rejected, contact @support."
+Груповий Режим (User View in Groups): /start in group — "DARKSHARE in group! Check risks here." Commands like /check IP → private consent to user → public result in group. Buttons same as private, but [Group Share] adds to group watchlist. Alerts: "🚨 Group alert: URL high risk!" + mute button. Дрібниці: Only respond to @darkshare_bot or commands. Limit 5 req/day/group for free.
+
+1.5 Інші Flows з Дрібницями
+
+Реферали: "Your code: DARK-ABC. Link: t.me/darkshare_bot?start=ref_ABC. Refs: 3/5 (-20% unlocked at 5 paid!)." Buttons: [Share to Chat/Group] (auto forward), [Rewards] ("Earned 2 USDT, payout to wallet? Input address.").
+Оплата: "Choose PRO 10 USDT (with ref -20%: 8)." → "Address: TRYbty... Send, input tx_hash or screenshot." → "Pending..." + [Check Status] (auto verify if tx confirmed via BlockCypher). Success: "Active! Unlimited req."
+Gamification: "Achievement unlocked: 10 checks - +badge +2 req!" Popup on login if streak.
+Settings: "Theme: Dark (switch to Light?)" + "Notifs: Push on, Digests daily." Button [Export Data] (GDPR JSON send).
+Errors/Notifications: "Req limit? Upgrade!" + button. Offline: "API down - retry in 5 min." Banned: "Access denied, contact admin."
+
+2. Погляд Розробника (Dev View: Логіка, Код, БД, Edge Cases)
+Dev: Async Python/aiogram, FastAPI for backend if needed (але чисто TG, no site). Stack: aiogram 3.x, PostgreSQL, Redis (cache/queues), Celery (monitoring tasks, PDF gen). Security: AES for inputs, rate-limit middleware. Deployment: Docker/AWS.
+2.1 БД Schemas (PostgreSQL з Дрібницями)
+
+users: id (BIGINT PK), username (VARCHAR), lang (VARCHAR2), tier (VARCHAR10 DEFAULT 'FREE'), requests_left (INT DEFAULT 15), streak_days (INT DEFAULT 0), ref_code (VARCHAR10 UNIQUE), discount_pct (INT DEFAULT 0), blocked (BOOL DEFAULT FALSE), created_at (TIMESTAMP).
+reports: id (SERIAL PK), user_id (FK), object_type (VARCHAR e.g. 'wallet'), data_json (JSONB results), pdf_path (VARCHAR temp file), generated_at (TIMESTAMP).
+watches: id (SERIAL PK), user_id (FK), object_type, value (VARCHAR e.g. '0x123'), thresholds_json (JSONB e.g. {'tx>10': true}), status (VARCHAR 'low/medium/high'), last_check (TIMESTAMP), alerts_on (BOOL DEFAULT TRUE).
+payments: id (SERIAL PK), user_id (FK), tier, amount_usdt (DECIMAL), tx_hash (VARCHAR), screenshot_url (VARCHAR), status (VARCHAR 'pending/approved/rejected'), mod_id (FK), timestamp.
+referrals: referrer_id (FK), referred_id (FK), paid (BOOL DEFAULT FALSE), PK (referrer, referred).
+mods: id (BIGINT PK), user_id (BIGINT), level (VARCHAR 'mod/admin').
+logs: id (SERIAL), uuid (UUID), action (VARCHAR e.g. 'check_wallet'), timestamp (anon, no IPs).
+Дрібниці: Indexes on user_id, ref_code. JSONB for flexible thresholds/data. Triggers: On payment approve → update user tier, reset requests.
+
+2.2 Логіка та Код (Приклади з Дрібницями)
+
+Response Logic (Modules, e.g. Wallet Check):
+Async: User input → consent callback → Celery task for API calls (Etherscan.get_balance(value) → format as string with flags/balance) → send msg with inline buttons.
+Код приклад (aiogram):Pythonfrom aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from celery import shared_task
+
+router = Router()
+
+@router.callback_query(F.data == 'module_blockchain')
+async def start_wallet_check(callback: CallbackQuery):
+    await callback.message.answer("Enter wallet address:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("Cancel", callback_data="cancel")]]))
+    await callback.answer()  # Async dismiss
+
+@router.message()  # Handle input
+async def handle_input(message: Message):
+    if 'wallet' in message.text.lower():  # Auto-detect
+        await message.answer("Consent: Your data? No store.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_wallet_{message.text}"), InlineKeyboardButton("❌ Cancel", callback_data="cancel")]]))
+
+@shared_task  # Celery for API
+def check_wallet(address):
+    # API calls: e.g., from blockcypher import Blockcypher
+    balance = Blockcypher.get_balance(address)  # Pseudo
+    flags = check_blacklists(address)  # AbuseIPDB etc.
+    return f"Result: {flags} Balance: {balance}"  # Format string
+
+@router.callback_query(F.data.startswith('confirm_wallet_'))
+async def process_check(callback: CallbackQuery):
+    address = callback.data.split('_')[2]
+    result = check_wallet.delay(address).get()  # Async get
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(InlineKeyboardButton("📄 PDF", callback_data=f"gen_pdf_{address}"))
+    keyboard.add(InlineKeyboardButton("👁 Monitor", callback_data=f"add_monitor_{address}"))
+    # ... інші
+    await callback.message.answer(result, reply_markup=keyboard)
+    # Decrement requests_left in DB: async SQLAlchemy updateДрібниці: Rate-limit: Middleware check Redis counter. Edge: Invalid address — return "Error: Not valid. Retry?" + button.
+PDF Logic (Generation/View):
+Async: Button → Celery task gen PDF (use ReportLab if installed, or matplotlib for charts + PyPDF2 for merge; since env no ReportLab, pseudo-code with matplotlib for chart img embed).
+Код приклад:Pythonimport matplotlib.pyplot as plt
+from PyPDF2 import PdfWriter  # Assume available or fallback
+from celery import shared_task
+import qrcode
+from io import BytesIO
+
+@shared_task
+def gen_pdf(user_id, data):
+    # Chart: Risk timeline
+    fig, ax = plt.subplots()
+    ax.plot([1,2,3], [10,20,5], label='Risk Score')
+    buffer = BytesIO()
+    fig.savefig(buffer, format='png')
+    buffer.seek(0)
+    # PDF
+    writer = PdfWriter()
+    # Add pages with text (pseudo, use canvas if ReportLab)
+    # Watermark: Add text overlay
+    # QR
+    qr = qrcode.make('verify_hash_sample')
+    qr.save('qr.png')
+    # Embed img
+    # Sig: Text "SHA256: hash(data)"
+    file_path = f"reports/{user_id}_{timestamp}.pdf"
+    # Save & return path
+    return file_path
+
+@router.callback_query(F.data.startswith('gen_pdf_'))
+async def send_pdf(callback: CallbackQuery):
+    data = callback.data.split('_')[2]  # e.g. address
+    pdf_path = gen_pdf.delay(callback.from_user.id, data).get()
+    await callback.bot.send_document(callback.message.chat.id, open(pdf_path, 'rb'), caption="PDF ready!")
+    os.remove(pdf_path)  # No storageДрібниці: Bulk: Loop gen for list, ZIP via zipfile lib. Edge: Gen fail — "Error, retry?" + log to admins.
+Monitoring Logic (Add/Alerts/Digests):
+Async: Add → insert to DB, Celery periodic task (every 5min) check API, if threshold hit — send push.
+Код приклад:Pythonfrom celery.schedules import crontab
+
+@app.task
+def monitor_check(watch_id):
+    watch = db.query(Watches).get(watch_id)  # SQLAlchemy
+    result = check_api(watch.value, watch.object_type)  # e.g. Etherscan
+    if result['risk'] > watch.thresholds.get('score', 50):  # Check jsonb
+        bot.send_message(watch.user_id, f"🚨 Alert: {watch.value} {result['risk']}!")
+
+# Celery beat for digests
+app.conf.beat_schedule = {'daily-digest': {'task': 'send_digests', 'schedule': crontab(hour=8, minute=0)}}  # Daily 8:00
+
+def send_digests():
+    for user in db.query(Users).filter(notifs_on=True):
+        changes = db.query(Watches).filter(user_id=user.id, last_check > yesterday).all()
+        if changes:
+            bot.send_message(user.id, f"Digest: {len(changes)} changes. Details: ...")Дрібниці: Threshold parse: Regex for "tx >10" → if tx_count > 10. Edge: No changes — no digest. Pause: Update DB alerts_on=False.
+Адмін/Мод Панель Logic:
+Async callbacks for buttons, DB updates.
+Код приклад for payments:Python@router.callback_query(F.data == 'payments_list')
+async def list_payments(callback: CallbackQuery):
+    if not is_mod(callback.from_user.id): return await callback.answer("Access denied!")
+    payments = db.query(Payments).filter(status='pending').all()
+    msg = "Pending:\n"
+    for p in payments:
+        msg += f"{p.id}: @ {p.user.username} {p.tier} {p.amount} USDT\n"
+        keyboard.add(InlineKeyboardButton("✅ Approve", callback_data=f"approve_{p.id}"))
+        keyboard.add(InlineKeyboardButton("❌ Reject", callback_data=f"reject_{p.id}"))
+    await callback.message.answer(msg, reply_markup=keyboard)
+
+@router.callback_query(F.data.startswith('approve_'))
+async def approve_payment(callback: CallbackQuery):
+    p_id = callback.data.split('_')[1]
+    payment = db.get(Payments, p_id)
+    payment.status = 'approved'
+    user = db.get(Users, payment.user_id)
+    user.tier = payment.tier
+    user.requests_left = unlimited if core else 500  # Logic
+    db.commit()
+    await bot.send_message(payment.user_id, "Subscription active! 🎉")
+    await callback.answer("Approved!")Дрібниці: A/B ads: Random variant A/B from Redis, track clicks in logs. Edge: No pending — "All clear!" Broadcast confirm: "Sent to 47312 users."
+Edge Cases & Testing (Dev Дрібниці):
+Consent no: "Cancelled. Back to dashboard."
+Req 0: "Limit hit. Upgrade?" + disable check buttons.
+Group no admin: "Add me as admin for full features."
+DB error: Retry + log to admin chat.
+Tests: Pytest for callbacks (mock bot), Locust for load (1000 users), OWASP for sec (SQL inj check).
