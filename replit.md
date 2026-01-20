@@ -12,17 +12,32 @@ The application consists of:
 
 ## Web Dashboard Features
 
+### Authentication
+- **Telegram Login Widget**: Users authenticate via Telegram OAuth
+- **Session Management**: PostgreSQL-backed sessions with `connect-pg-simple`
+- **Unified Accounts**: Telegram bot users automatically have web access with same tier/quota
+- **HMAC Verification**: Telegram auth payloads verified server-side
+- **Session Security**: HttpOnly, SameSite=Lax, session regeneration on login
+
 ### Routes
 - `/` - Landing page with "Web Dashboard" and "Telegram Bot" buttons
-- `/dashboard` - Check form with 6 check types (IP, wallet, email, phone, domain, URL)
-- `/history` - Report history with PDF download capability
-- `/monitoring` - Watchlist management (add/view/delete monitors)
+- `/login` - Telegram authentication page
+- `/dashboard` - Check form with 6 check types (protected route)
+- `/history` - Report history with PDF download (protected route)
+- `/monitoring` - Watchlist management (protected route)
 
 ### API Endpoints
-- `POST /api/check` - Performs security checks with validation and risk analysis
-- `GET /api/reports` - Lists user reports
-- `GET /api/reports/:id/pdf` - Downloads PDF report
-- `GET /api/watches` - Lists user monitors
+
+#### Authentication
+- `POST /api/auth/telegram` - Telegram login (HMAC verified)
+- `GET /api/auth/me` - Get current authenticated user
+- `POST /api/auth/logout` - Logout and destroy session
+
+#### Protected Endpoints (require authentication)
+- `POST /api/check` - Performs security checks
+- `GET /api/reports` - Lists user's reports
+- `GET /api/reports/:id/pdf` - Downloads PDF (ownership verified)
+- `GET /api/watches` - Lists user's monitors
 - `POST /api/watches` - Creates a new monitor
 - `DELETE /api/watches/:id` - Deletes a monitor
 

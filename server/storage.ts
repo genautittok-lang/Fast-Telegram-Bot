@@ -4,9 +4,11 @@ import { eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
+  getUserById(id: number): Promise<User | undefined>;
   getUserByTgId(tgId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
+  updateUserLogin(id: number): Promise<void>;
   
   // Reports
   createReport(report: any): Promise<Report>;
@@ -42,6 +44,14 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
     const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
     return user;
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    return this.getUser(id);
+  }
+
+  async updateUserLogin(id: number): Promise<void> {
+    await db.update(users).set({ lastLogin: new Date() }).where(eq(users.id, id));
   }
 
   async createReport(insertReport: any): Promise<Report> {

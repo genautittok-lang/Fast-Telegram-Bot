@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -19,7 +19,9 @@ import {
   ArrowLeft,
   Download,
   Eye,
-  X
+  X,
+  LogOut,
+  User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 interface CheckResult {
   type: string;
@@ -58,6 +61,8 @@ export default function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const [, setLocation] = useLocation();
 
   const checkMutation = useMutation({
     mutationFn: async ({ type, value }: { type: string; value: string }) => {
@@ -66,7 +71,6 @@ export default function Dashboard() {
     },
     onSuccess: (data) => {
       setResult(data);
-      // Invalidate reports cache so history page shows the new report
       queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
     },
     onError: (error: any) => {
@@ -77,6 +81,17 @@ export default function Dashboard() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [isLoading, isAuthenticated, setLocation]);
+
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/login");
+  };
 
   const handleCheck = () => {
     // Use inputRef value as fallback for Playwright compatibility
@@ -116,6 +131,18 @@ export default function Dashboard() {
 
   const selectedCheck = checkTypes.find(c => c.id === selectedType);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
@@ -134,7 +161,7 @@ export default function Dashboard() {
               <Badge variant="outline" className="text-xs">Dashboard</Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Link href="/history">
               <Button variant="ghost" size="sm" data-testid="button-history">
                 <FileText className="w-4 h-4 mr-2" />
@@ -147,6 +174,21 @@ export default function Dashboard() {
                 Моніторинг
               </Button>
             </Link>
+            <div className="flex items-center gap-2 pl-3 border-l border-white/10">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">@{user?.username}</span>
+                <Badge variant="secondary" className="text-xs">{user?.tier}</Badge>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleLogout}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>

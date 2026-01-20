@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { 
@@ -19,7 +20,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 interface Report {
   id: number;
@@ -40,9 +42,31 @@ const typeIcons: Record<string, any> = {
 };
 
 export default function History() {
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+
   const { data: reports, isLoading } = useQuery<Report[]>({
     queryKey: ["/api/reports"],
+    enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const getRiskColor = (level: string) => {
     switch (level) {

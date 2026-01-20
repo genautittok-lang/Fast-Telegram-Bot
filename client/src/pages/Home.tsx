@@ -135,7 +135,7 @@ export default function Home() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4 pt-4">
-                  <Link href="/dashboard">
+                  <Link href="/login">
                     <div 
                       className="group relative px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl text-lg flex items-center gap-2 overflow-hidden transition-transform hover:scale-105 active:scale-95 cursor-pointer"
                       data-testid="button-web-dashboard"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { 
@@ -22,9 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 interface Watch {
   id: number;
@@ -57,10 +58,19 @@ export default function Monitoring() {
   const [newType, setNewType] = useState("ip");
   const [newValue, setNewValue] = useState("");
   const { toast } = useToast();
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
 
   const { data: watches, isLoading } = useQuery<Watch[]>({
     queryKey: ["/api/watches"],
+    enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
 
   const createMutation = useMutation({
     mutationFn: async ({ type, value }: { type: string; value: string }) => {
@@ -109,6 +119,18 @@ export default function Monitoring() {
     }
     createMutation.mutate({ type: newType, value: newValue.trim() });
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">

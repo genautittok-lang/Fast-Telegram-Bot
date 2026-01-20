@@ -1,10 +1,12 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupBot } from "./bot";
 import { api } from "@shared/routes";
 import { performCheck, validateInput } from "./checkService";
 import { generateDetailedPDF, generateFindings, generateMetadata } from "./pdfGenerator";
+import { verifyTelegramAuth, type AuthenticatedRequest } from "./auth";
+import type { User } from "@shared/schema";
 
 // Server start time for uptime calculation
 const serverStartTime = Date.now();
@@ -78,8 +80,111 @@ export async function registerRoutes(
     res.json(leaderboard);
   });
 
-  // Web check endpoint
-  app.post(api.check.perform.path, async (req, res) => {
+  // Auth middleware to load user
+  const loadUser = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (req.session?.userId) {
+      const user = await storage.getUserById(req.session.userId);
+      if (user) {
+        req.user = user;
+      }
+    }
+    next();
+  };
+
+  // Require auth middleware
+  const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.session?.userId || !req.user) {
+      return res.status(401).json({ error: "Unauthorized. Please login with Telegram." });
+    }
+    next();
+  };
+
+  // Telegram Login endpoint
+  app.post("/api/auth/telegram", async (req, res) => {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      return res.status(500).json({ error: "Bot not configured" });
+    }
+
+    const telegramData = req.body;
+    
+    if (!verifyTelegramAuth(telegramData, botToken)) {
+      return res.status(401).json({ error: "Invalid Telegram authentication" });
+    }
+
+    const tgId = telegramData.id?.toString();
+    const username = telegramData.username || telegramData.first_name || "user";
+    const firstName = telegramData.first_name || "";
+    const photoUrl = telegramData.photo_url || "";
+
+    if (!tgId) {
+      return res.status(400).json({ error: "Missing Telegram ID" });
+    }
+
+    let user = await storage.getUserByTgId(tgId);
+    
+    if (!user) {
+      user = await storage.createUser({
+        tgId,
+        username,
+        lang: "UA",
+        tier: "FREE",
+      });
+    } else {
+      await storage.updateUserLogin(user.id);
+    }
+
+    const finalUser = user;
+    req.session.regenerate((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Session error" });
+      }
+      req.session.userId = finalUser.id;
+      req.session.tgId = tgId;
+      req.session.save((err) => {
+        if (err) {
+          return res.status(500).json({ error: "Session save error" });
+        }
+        res.json({
+          id: finalUser.id,
+          tgId: finalUser.tgId,
+          username: finalUser.username,
+          tier: finalUser.tier,
+          requestsLeft: finalUser.requestsLeft,
+          firstName,
+          photoUrl,
+        });
+      });
+    });
+  });
+
+  // Get current user
+  app.get("/api/auth/me", loadUser, async (req: AuthenticatedRequest, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    res.json({
+      id: req.user.id,
+      tgId: req.user.tgId,
+      username: req.user.username,
+      tier: req.user.tier,
+      requestsLeft: req.user.requestsLeft,
+    });
+  });
+
+  // Logout
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Web check endpoint (requires auth)
+  app.post(api.check.perform.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
     const { type, value } = req.body;
     
     if (!type || !value) {
@@ -97,9 +202,9 @@ export async function registerRoutes(
       // Add to activity feed
       addActivity(type, value, result.riskLevel);
 
-      // Store report using schema columns
+      // Store report using authenticated user
       await storage.createReport({
-        userId: 1, // Default user for web
+        userId: req.user!.id,
         objectType: type,
         dataJson: { 
           target: value, 
@@ -119,9 +224,9 @@ export async function registerRoutes(
     }
   });
 
-  // Reports list endpoint
-  app.get(api.reports.list.path, async (req, res) => {
-    const reports = await storage.getReports(1); // Default user
+  // Reports list endpoint (requires auth)
+  app.get(api.reports.list.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
+    const reports = await storage.getReports(req.user!.id);
     res.json(reports.map(r => {
       const data = r.dataJson as any || {};
       return {
@@ -135,13 +240,17 @@ export async function registerRoutes(
     }));
   });
 
-  // PDF download endpoint
-  app.get(api.reports.download.path, async (req, res) => {
+  // PDF download endpoint (requires auth)
+  app.get(api.reports.download.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
     const id = parseInt(req.params.id);
     const report = await storage.getReportById(id);
     
     if (!report) {
       return res.status(404).json({ error: "Report not found" });
+    }
+
+    if (report.userId !== req.user!.id) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const data = report.dataJson as any || {};
@@ -155,7 +264,7 @@ export async function registerRoutes(
         riskLevel,
         riskScore,
         timestamp: report.generatedAt || new Date(),
-        userId: 'web-user',
+        userId: req.user!.username || 'user',
         findings: data.findings || generateFindings(report.objectType || 'unknown', riskLevel),
         sources: ["DARKSHARE Intel"],
         metadata: generateMetadata(report.objectType || 'unknown'),
@@ -169,21 +278,21 @@ export async function registerRoutes(
     }
   });
 
-  // Watches list endpoint
-  app.get(api.watches.list.path, async (req, res) => {
-    const watches = await storage.getWatches(1); // Default user
+  // Watches list endpoint (requires auth)
+  app.get(api.watches.list.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
+    const watches = await storage.getWatches(req.user!.id);
     res.json(watches.map(w => ({
       id: w.id,
       objectType: w.objectType,
       value: w.value,
       status: w.status || 'active',
       lastCheck: w.lastCheck?.toISOString() || null,
-      createdAt: new Date().toISOString(), // watches table doesn't have createdAt
+      createdAt: new Date().toISOString(),
     })));
   });
 
-  // Create watch endpoint
-  app.post(api.watches.create.path, async (req, res) => {
+  // Create watch endpoint (requires auth)
+  app.post(api.watches.create.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
     const { type, value, threshold } = req.body;
     
     if (!type || !value) {
@@ -192,7 +301,7 @@ export async function registerRoutes(
 
     try {
       const watch = await storage.createWatch({
-        userId: 1,
+        userId: req.user!.id,
         objectType: type,
         value,
         thresholdsJson: { scoreThreshold: threshold || 50 },
@@ -204,8 +313,8 @@ export async function registerRoutes(
     }
   });
 
-  // Delete watch endpoint
-  app.delete(api.watches.delete.path, async (req, res) => {
+  // Delete watch endpoint (requires auth)
+  app.delete(api.watches.delete.path, loadUser, requireAuth, async (req: AuthenticatedRequest, res) => {
     const id = parseInt(req.params.id);
     try {
       await storage.deleteWatch(id);
