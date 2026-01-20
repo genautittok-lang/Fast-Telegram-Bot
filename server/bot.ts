@@ -283,6 +283,56 @@ Daily tip: Check IP на blacklists!
     const user = await storage.getUserByTgId(tgId);
     const state = userStates.get(tgId);
 
+    // Handle payment tx hash
+    if (state?.module === "payment" && state?.step === "awaiting_proof") {
+      if (!user) return;
+      
+      const txHash = text.trim();
+      
+      const payment = await storage.createPayment({
+        userId: user.id,
+        tier: state.data.tier,
+        amountUsdt: state.data.amount,
+        txHash: txHash,
+        status: "pending",
+      });
+
+      userStates.delete(tgId);
+
+      await ctx.reply(`✅ Запит на оплату #${payment.id} створено!
+
+Тариф: ${state.data.tier}
+Сума: $${state.data.amount} USDT
+TX Hash: ${txHash}
+
+Очікуйте підтвердження від модератора.`, 
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      );
+
+      for (const adminId of ADMIN_IDS) {
+        try {
+          await ctx.telegram.sendMessage(adminId, `💳 Нова оплата #${payment.id}
+
+Користувач: @${user.username} (ID: ${user.tgId})
+Тариф: ${state.data.tier}
+Сума: $${state.data.amount} USDT
+TX Hash: ${txHash}`, 
+            {
+              reply_markup: Markup.inlineKeyboard([
+                [
+                  Markup.button.callback("✅ Прийняти", `approve_pay_${payment.id}`),
+                  Markup.button.callback("❌ Відхилити", `reject_pay_${payment.id}`)
+                ]
+              ]).reply_markup
+            }
+          );
+        } catch (e) {
+          console.log(`Failed to notify admin ${adminId}:`, e);
+        }
+      }
+      return;
+    }
+
     // Check requests limit
     if (user && user.requestsLeft! <= 0) {
       return ctx.reply("❌ Ліміт запитів вичерпано!\n\nОтримай PRO для безлімітних перевірок.", 
@@ -606,6 +656,9 @@ Sources: VirusTotal, Google Safe`;
   bot.action(["buy_pro", "buy_enterprise"], async (ctx) => {
     const tier = ctx.match.input === "buy_pro" ? "PRO" : "ENTERPRISE";
     const amount = tier === "PRO" ? "10" : "50";
+    const tgId = ctx.from!.id.toString();
+
+    userStates.set(tgId, { module: "payment", step: "awaiting_proof", data: { tier, amount } });
 
     await ctx.reply(`💳 Оплата ${tier}
 
@@ -613,9 +666,163 @@ Sources: VirusTotal, Google Safe`;
 
 Адреса: TRYbty7cEgk4ioFqBt5x5aFwqowhk7hJAm
 
-Після оплати надішли tx_hash або скріншот.`, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+Після оплати надішли:
+• TX Hash (текстом)
+• АБО скріншот оплати
+
+Твій запит буде перевірено модератором.`, 
+      Markup.inlineKeyboard([
+        [Markup.button.callback("❌ Скасувати", "back_to_dashboard")]
+      ])
     );
+  });
+
+  // Handle photo for payment proof
+  bot.on("photo", async (ctx) => {
+    const tgId = ctx.from!.id.toString();
+    const state = userStates.get(tgId);
+    
+    if (state?.module === "payment" && state?.step === "awaiting_proof") {
+      const user = await storage.getUserByTgId(tgId);
+      if (!user) return;
+
+      const photo = ctx.message.photo[ctx.message.photo.length - 1];
+      const fileId = photo.file_id;
+      
+      const payment = await storage.createPayment({
+        userId: user.id,
+        tier: state.data.tier,
+        amountUsdt: state.data.amount,
+        screenshotUrl: fileId,
+        status: "pending",
+      });
+
+      userStates.delete(tgId);
+
+      await ctx.reply(`✅ Запит на оплату #${payment.id} створено!
+
+Тариф: ${state.data.tier}
+Сума: $${state.data.amount} USDT
+
+Очікуйте підтвердження від модератора.`, 
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      );
+
+      for (const adminId of ADMIN_IDS) {
+        try {
+          await ctx.telegram.sendPhoto(adminId, fileId, {
+            caption: `💳 Нова оплата #${payment.id}
+
+Користувач: @${user.username} (ID: ${user.tgId})
+Тариф: ${state.data.tier}
+Сума: $${state.data.amount} USDT
+Тип: Скріншот`,
+            reply_markup: Markup.inlineKeyboard([
+              [
+                Markup.button.callback("✅ Прийняти", `approve_pay_${payment.id}`),
+                Markup.button.callback("❌ Відхилити", `reject_pay_${payment.id}`)
+              ]
+            ]).reply_markup
+          });
+        } catch (e) {
+          console.log(`Failed to notify admin ${adminId}:`, e);
+        }
+      }
+    }
+  });
+
+  // Handle payment approval/rejection
+  bot.action(/^approve_pay_(\d+)$/, async (ctx) => {
+    const adminTgId = ctx.from!.id.toString();
+    if (!ADMIN_IDS.includes(adminTgId)) {
+      return ctx.answerCbQuery("Доступ заборонено");
+    }
+
+    const paymentId = parseInt(ctx.match[1]);
+    const payment = await storage.getPaymentById(paymentId);
+    
+    if (!payment) {
+      return ctx.answerCbQuery("Платіж не знайдено");
+    }
+
+    if (payment.status !== "pending") {
+      return ctx.answerCbQuery("Платіж вже оброблено");
+    }
+
+    await storage.updatePaymentStatus(paymentId, "approved");
+
+    const user = await storage.getUserById(payment.userId!);
+    if (user) {
+      const requestsToAdd = payment.tier === "PRO" ? 100 : 500;
+      await storage.updateUser(user.id, { 
+        tier: payment.tier,
+        requestsLeft: (user.requestsLeft || 0) + requestsToAdd
+      });
+
+      try {
+        await ctx.telegram.sendMessage(user.tgId, `🎉 Оплату #${paymentId} підтверджено!
+
+Ваш тариф: ${payment.tier}
+Додано запитів: ${requestsToAdd}
+
+Дякуємо за підтримку!`, 
+          Markup.inlineKeyboard([[Markup.button.callback("🚀 Dashboard", "dashboard")]])
+        );
+      } catch (e) {
+        console.log(`Failed to notify user:`, e);
+      }
+    }
+
+    await ctx.editMessageCaption(`✅ ПІДТВЕРДЖЕНО модератором @${ctx.from!.username}
+
+Платіж #${paymentId}
+Користувач: ${user?.username}
+Тариф: ${payment.tier}`);
+    await ctx.answerCbQuery("Платіж підтверджено!");
+  });
+
+  bot.action(/^reject_pay_(\d+)$/, async (ctx) => {
+    const adminTgId = ctx.from!.id.toString();
+    if (!ADMIN_IDS.includes(adminTgId)) {
+      return ctx.answerCbQuery("Доступ заборонено");
+    }
+
+    const paymentId = parseInt(ctx.match[1]);
+    const payment = await storage.getPaymentById(paymentId);
+    
+    if (!payment) {
+      return ctx.answerCbQuery("Платіж не знайдено");
+    }
+
+    if (payment.status !== "pending") {
+      return ctx.answerCbQuery("Платіж вже оброблено");
+    }
+
+    await storage.updatePaymentStatus(paymentId, "rejected");
+
+    const user = await storage.getUserById(payment.userId!);
+    if (user) {
+      try {
+        await ctx.telegram.sendMessage(user.tgId, `❌ Оплату #${paymentId} відхилено.
+
+Можливі причини:
+• Неправильна сума
+• Невідповідний скріншот
+• Транзакцію не знайдено
+
+Зверніться до підтримки для уточнення.`, 
+          Markup.inlineKeyboard([[Markup.button.callback("💳 Спробувати ще", "upgrade")]])
+        );
+      } catch (e) {
+        console.log(`Failed to notify user:`, e);
+      }
+    }
+
+    await ctx.editMessageCaption(`❌ ВІДХИЛЕНО модератором @${ctx.from!.username}
+
+Платіж #${paymentId}
+Користувач: ${user?.username}`);
+    await ctx.answerCbQuery("Платіж відхилено");
   });
 
   // --- Coupon ---

@@ -21,6 +21,12 @@ export interface IStorage {
   updateWatch(id: number, updates: Partial<Watch>): Promise<Watch>;
   deleteWatch(id: number): Promise<void>;
   
+  // Payments
+  createPayment(payment: any): Promise<Payment>;
+  getPaymentById(id: number): Promise<Payment | undefined>;
+  getPendingPayments(): Promise<Payment[]>;
+  updatePaymentStatus(id: number, status: string): Promise<Payment>;
+  
   // Stats
   getStats(): Promise<{ totalUsers: number, activeWatches: number }>;
 }
@@ -93,6 +99,25 @@ export class DatabaseStorage implements IStorage {
       totalUsers: Number(userCount?.count || 0),
       activeWatches: Number(watchCount?.count || 0),
     };
+  }
+
+  async createPayment(insertPayment: any): Promise<Payment> {
+    const [payment] = await db.insert(payments).values(insertPayment).returning();
+    return payment;
+  }
+
+  async getPaymentById(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment;
+  }
+
+  async getPendingPayments(): Promise<Payment[]> {
+    return await db.select().from(payments).where(eq(payments.status, "pending"));
+  }
+
+  async updatePaymentStatus(id: number, status: string): Promise<Payment> {
+    const [payment] = await db.update(payments).set({ status }).where(eq(payments.id, id)).returning();
+    return payment;
   }
 }
 
