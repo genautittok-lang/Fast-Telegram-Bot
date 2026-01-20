@@ -1,15 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+
+interface Stats {
+  totalUsers: number;
+  activeWatches: number;
+  totalReports: number;
+  checksToday: number;
+  threatsBlocked: number;
+  uptime: number;
+}
 
 export function useStats() {
-  return useQuery({
-    queryKey: [api.stats.get.path],
-    queryFn: async () => {
-      const res = await fetch(api.stats.get.path);
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      return api.stats.get.responses[200].parse(await res.json());
-    },
-    // Refresh stats every 30 seconds for live feel
-    refetchInterval: 30000, 
+  return useQuery<Stats>({
+    queryKey: ["/api/stats"],
+    refetchInterval: 10000,
   });
 }

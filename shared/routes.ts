@@ -42,7 +42,38 @@ export const api = {
         200: z.object({
           totalUsers: z.number(),
           activeWatches: z.number(),
+          totalReports: z.number(),
+          checksToday: z.number(),
+          threatsBlocked: z.number(),
+          uptime: z.number(),
         }),
+      },
+    }
+  },
+  activity: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/activity',
+      responses: {
+        200: z.array(z.object({
+          type: z.string(),
+          target: z.string(),
+          riskLevel: z.string(),
+          timestamp: z.string(),
+        })),
+      },
+    }
+  },
+  leaderboard: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/leaderboard',
+      responses: {
+        200: z.array(z.object({
+          username: z.string(),
+          checks: z.number(),
+          streakDays: z.number(),
+        })),
       },
     }
   }

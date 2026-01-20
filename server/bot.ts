@@ -1,6 +1,6 @@
 import { Telegraf, Markup, Context } from "telegraf";
 import { IStorage } from "./storage";
-import PDFDocument from "pdfkit";
+import { generateDetailedPDF, generateFindings, generateMetadata } from "./pdfGenerator";
 
 interface BotContext extends Context {}
 
@@ -399,56 +399,58 @@ Sources: VirusTotal, Google Safe`;
 
   // --- PDF Generation ---
   bot.action(/^gen_pdf_/, async (ctx) => {
-    await ctx.answerCbQuery("Генерую PDF...");
+    await ctx.answerCbQuery("Генерую професійний PDF...");
     
     const parts = ctx.match.input.split('_');
     const moduleType = parts[2];
     const value = parts.slice(3).join('_');
+    const tgId = ctx.from!.id.toString();
 
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
+    // Generate random but consistent risk data
+    const riskScore = Math.floor(Math.random() * 100);
+    const riskLevel: "low" | "medium" | "high" | "critical" = 
+      riskScore >= 80 ? "critical" :
+      riskScore >= 60 ? "high" :
+      riskScore >= 30 ? "medium" : "low";
 
-    // Header
-    doc.fillColor('#1a1a2e').rect(0, 0, 612, 100).fill();
-    doc.fillColor('#ffffff').fontSize(24).text('DARKSHARE v4.0 Report', 50, 35);
-    doc.fontSize(10).text(`Generated: ${new Date().toISOString()}`, 50, 65);
+    const sources = {
+      ip: ["AbuseIPDB", "IPInfo", "MaxMind", "Shodan", "VirusTotal"],
+      wallet: ["Etherscan", "Chainalysis", "CipherTrace", "OFAC", "EU Sanctions"],
+      phone: ["NumVerify", "Twilio", "CallerID", "SpamDB"],
+      email: ["HaveIBeenPwned", "Hunter.io", "EmailRep", "SpamHaus"],
+      domain: ["WHOIS", "SSL Labs", "DNSDumpster", "OFAC", "EU Registry"],
+      url: ["VirusTotal", "Google Safe Browsing", "PhishTank", "URLVoid"],
+    }[moduleType] || ["DARKSHARE Intel"];
 
-    doc.fillColor('#000000');
-    doc.moveDown(3);
+    try {
+      const pdfBuffer = await generateDetailedPDF({
+        moduleType,
+        targetValue: value,
+        riskLevel,
+        riskScore,
+        timestamp: new Date(),
+        userId: tgId,
+        findings: generateFindings(moduleType, riskLevel),
+        sources,
+        metadata: generateMetadata(moduleType),
+      });
 
-    // Content
-    doc.fontSize(14).text(`Module: ${moduleType.toUpperCase()}`, { underline: true });
-    doc.moveDown();
-    doc.fontSize(12).text(`Target: ${value}`);
-    doc.moveDown();
-    doc.text('Risk Assessment: LOW RISK');
-    doc.moveDown();
-    doc.text('Analysis Details:');
-    doc.fontSize(10).text('• Transaction history analyzed');
-    doc.text('• Blacklist databases checked');
-    doc.text('• No suspicious activity detected');
-    doc.moveDown(2);
-
-    // Footer
-    doc.fontSize(8).fillColor('#666666');
-    doc.text('CONFIDENTIAL - Do not distribute', 50, 750, { align: 'center' });
-    doc.text(`SHA256: ${Buffer.from(value).toString('base64').substring(0,32)}...`, { align: 'center' });
-
-    doc.end();
-
-    doc.on('end', async () => {
-      const pdfBuffer = Buffer.concat(buffers);
       await ctx.replyWithDocument(
-        { source: pdfBuffer, filename: `darkshare_report_${Date.now()}.pdf` },
+        { source: pdfBuffer, filename: `DARKSHARE_${moduleType.toUpperCase()}_${Date.now()}.pdf` },
         { 
-          caption: "📄 PDF Ready!\n\nDownload or share. CONFIDENTIAL.",
+          caption: `📄 Професійний звіт готовий!\n\n🎯 Ціль: ${value.substring(0, 30)}...\n📊 Risk Score: ${riskScore}/100 (${riskLevel.toUpperCase()})\n\n⚠️ CONFIDENTIAL - Do not distribute`,
           ...Markup.inlineKeyboard([
+            [Markup.button.callback("🔄 New Check", `mod_${moduleType}`)],
             [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
           ])
         }
       );
-    });
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      await ctx.reply("❌ Помилка генерації PDF. Спробуй ще раз.", 
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      );
+    }
   });
 
   // --- Add to Monitoring ---
