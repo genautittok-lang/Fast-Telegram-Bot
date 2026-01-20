@@ -2,11 +2,19 @@ import { Telegraf, Markup, Context } from "telegraf";
 import { IStorage } from "./storage";
 import { generateDetailedPDF, generateFindings, generateMetadata } from "./pdfGenerator";
 import { performCheck, CheckResult } from "./checkService";
+import { t, Language, languageNames } from "./i18n";
 
 interface BotContext extends Context {}
 
-// Admin IDs - add your Telegram user ID here
-const ADMIN_IDS = ["123456789"]; // Replace with actual admin TG IDs
+const ADMIN_IDS = ["123456789"];
+
+function getUserLang(langCode: string | null | undefined): Language {
+  if (!langCode) return "uk";
+  const code = langCode.toLowerCase();
+  if (code === "uk" || code === "ua") return "uk";
+  if (code === "ru") return "ru";
+  return "en";
+}
 
 export async function setupBot(storage: IStorage) {
   console.log("Setting up Telegram bot...");
@@ -19,24 +27,22 @@ export async function setupBot(storage: IStorage) {
 
   const bot = new Telegraf<BotContext>(token);
 
-  // Test bot token
   bot.telegram.getMe()
     .then((botInfo) => console.log("Bot info:", botInfo.username))
     .catch((err) => console.error("Failed to get bot info:", err.message));
 
-  // User state tracking for conversation flow
   const userStates: Map<string, { module?: string; step?: string; data?: any }> = new Map();
 
-  // Middleware - ensure user exists
   bot.use(async (ctx, next) => {
     if (ctx.from) {
       const tgId = ctx.from.id.toString();
       let user = await storage.getUserByTgId(tgId);
       if (!user) {
+        const detectedLang = getUserLang(ctx.from.language_code);
         user = await storage.createUser({
           tgId,
           username: ctx.from.username,
-          lang: ctx.from.language_code === 'uk' ? 'UA' : 'EN',
+          lang: detectedLang,
           requestsLeft: 15,
           streakDays: 1,
           refCode: `DARK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
@@ -46,245 +52,199 @@ export async function setupBot(storage: IStorage) {
     return next();
   });
 
-  // /start command
+  async function getLang(tgId: string): Promise<Language> {
+    const user = await storage.getUserByTgId(tgId);
+    return getUserLang(user?.lang);
+  }
+
   bot.command("start", async (ctx) => {
     const text = ctx.message.text;
     const refMatch = text.match(/start=ref_(\w+)/);
+    const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
     
-    let welcomeText = `Доброго, ${ctx.from.first_name}! 👋
-
-🌑 DARKSHARE v4.0 — твій щит від ризиків.
-Join 100k+ юзерів!`;
+    let welcomeText = t(lang, "welcome", { 
+      username: ctx.from.first_name || ctx.from.username || "User",
+      tgId: tgId 
+    });
 
     if (refMatch) {
-      welcomeText += `\n\n🎁 Вітаю від друга! +1 безкоштовний запит.`;
+      welcomeText += lang === "uk" 
+        ? "\n\n🎁 Вітаю від друга! +1 безкоштовний запит."
+        : lang === "ru" 
+        ? "\n\n🎁 Приветствие от друга! +1 бесплатный запрос."
+        : "\n\n🎁 Greeting from a friend! +1 free request.";
     }
 
-    welcomeText += `\n\nОбери мову / Choose language:`;
+    welcomeText += lang === "uk" 
+      ? "\n\nОбери мову / Choose language:"
+      : lang === "ru"
+      ? "\n\nВыбери язык / Choose language:"
+      : "\n\nSelect language:";
 
     await ctx.reply(welcomeText, Markup.inlineKeyboard([
       [
-        Markup.button.callback("🇺🇦 UA", "lang_ua"),
-        Markup.button.callback("🇬🇧 EN", "lang_en"),
-        Markup.button.callback("🇷🇺 RU", "lang_ru")
+        Markup.button.callback("🇺🇦 Українська", "lang_uk"),
+        Markup.button.callback("🇬🇧 English", "lang_en"),
+        Markup.button.callback("🇷🇺 Русский", "lang_ru")
       ]
     ]));
   });
 
-  // Language selection
   bot.action(/^lang_/, async (ctx) => {
-    const lang = ctx.match.input.split('_')[1].toUpperCase();
+    const langCode = ctx.match.input.split('_')[1] as Language;
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
     if (user) {
-      await storage.updateUser(user.id, { lang });
+      await storage.updateUser(user.id, { lang: langCode });
     }
-    await ctx.answerCbQuery(`Мова: ${lang}`);
-    await ctx.editMessageText(`✅ Мова встановлена: ${lang}\n\nТепер перейди до дашборду!`, 
-      Markup.inlineKeyboard([[Markup.button.callback("🚀 Старт", "dashboard")]])
+    await ctx.answerCbQuery(t(langCode, "settings.languageChanged"));
+    
+    const startText = langCode === "uk" 
+      ? "✅ Мову встановлено: Українська\n\nТепер перейди до панелі!"
+      : langCode === "ru"
+      ? "✅ Язык установлен: Русский\n\nТеперь перейди в панель!"
+      : "✅ Language set: English\n\nNow go to dashboard!";
+    
+    await ctx.editMessageText(startText, 
+      Markup.inlineKeyboard([[Markup.button.callback("🚀 " + t(langCode, "buttons.back").replace("⬅️ ", ""), "dashboard")]])
     );
   });
 
-  // Dashboard
-  bot.action(["dashboard", "back_to_dashboard"], async (ctx) => {
-    const tgId = ctx.from!.id.toString();
+  async function showDashboard(ctx: any, tgId: string, isEdit: boolean = true) {
     const user = await storage.getUserByTgId(tgId);
-    userStates.delete(tgId); // Clear any pending state
+    const lang = getUserLang(user?.lang);
+    userStates.delete(tgId);
 
     const requestsWarning = user && user.requestsLeft! <= 3 
-      ? `\n⚠️ Мало запитів! Оновити план?` 
+      ? (lang === "uk" ? "\n⚠️ Мало запитів!" : lang === "ru" ? "\n⚠️ Мало запросов!" : "\n⚠️ Low requests!")
       : '';
 
-    const dashboardText = `🌑 DARKSHARE Панель
+    const tipText = lang === "uk" 
+      ? "💡 Порада дня: Перевіряй IP на чорних списках!"
+      : lang === "ru"
+      ? "💡 Совет дня: Проверяй IP на чёрных списках!"
+      : "💡 Tip of the day: Check IPs against blacklists!";
 
-📊 Запитів: ${user?.requestsLeft}/15 (БЕЗКОШТОВНО)
-🔥 Серія: ${user?.streakDays} днів
-📣 Реферали: 0/5 (до -20%)${requestsWarning}
+    const tierName = lang === "uk" ? "БЕЗКОШТОВНО" : lang === "ru" ? "БЕСПЛАТНО" : "FREE";
+    
+    const dashboardText = `${t(lang, "dashboard.title")}
 
-💡 Порада дня: Перевіряй IP на чорних списках!
+${t(lang, "dashboard.stats", { requestsLeft: user?.requestsLeft?.toString() || "15", requestsLimit: "15" })} (${tierName})
+🔥 ${lang === "uk" ? "Серія" : lang === "ru" ? "Серия" : "Streak"}: ${user?.streakDays} ${lang === "uk" ? "днів" : lang === "ru" ? "дней" : "days"}${requestsWarning}
 
-Обери модуль:`;
+${tipText}
+
+${t(lang, "dashboard.selectModule")}`;
 
     const webUrl = process.env.REPLIT_DEV_DOMAIN 
       ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
       : "https://darkshare.replit.app";
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(t(lang, "modules.ip"), "mod_ip"),
+        Markup.button.callback(t(lang, "modules.wallet"), "mod_wallet"),
+        Markup.button.callback(t(lang, "modules.phone"), "mod_phone")
+      ],
+      [
+        Markup.button.callback(t(lang, "modules.email"), "mod_email"),
+        Markup.button.callback(t(lang, "modules.domain"), "mod_business"),
+        Markup.button.callback(t(lang, "modules.url"), "mod_url")
+      ],
+      [
+        Markup.button.callback(t(lang, "modules.cve") + " 🔒", "mod_cve"),
+        Markup.button.callback(t(lang, "modules.iot") + " 🔒", "mod_iot"),
+        Markup.button.callback(t(lang, "modules.cloud") + " 🔒", "mod_cloud")
+      ],
+      [
+        Markup.button.callback(t(lang, "buttons.monitoring"), "monitoring"),
+        Markup.button.callback("📄 " + (lang === "uk" ? "Звіти" : lang === "ru" ? "Отчёты" : "Reports"), "reports"),
+        Markup.button.callback(t(lang, "buttons.history"), "history")
+      ],
+      [
+        Markup.button.callback(t(lang, "buttons.settings"), "settings"),
+        Markup.button.callback(t(lang, "buttons.upgrade"), "upgrade"),
+        Markup.button.callback(t(lang, "buttons.referrals"), "referrals")
+      ],
+      [
+        Markup.button.callback(t(lang, "buttons.coupon"), "coupon"),
+        Markup.button.callback(t(lang, "buttons.achievements"), "achievements")
+      ],
+      [
+        Markup.button.url("🖥️ " + (lang === "uk" ? "Веб-панель" : lang === "ru" ? "Веб-панель" : "Web Panel"), webUrl)
+      ]
+    ]);
 
     try {
-      await ctx.editMessageText(dashboardText, Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-          Markup.button.callback("💰 Гаманець", "mod_wallet"),
-          Markup.button.callback("📱 Телефон", "mod_phone")
-        ],
-        [
-          Markup.button.callback("📧 Email", "mod_email"),
-          Markup.button.callback("🏢 Домен", "mod_business"),
-          Markup.button.callback("🔗 URL", "mod_url")
-        ],
-        [
-          Markup.button.callback("🛡️ CVE 🔒", "mod_cve"),
-          Markup.button.callback("📡 IoT 🔒", "mod_iot"),
-          Markup.button.callback("☁️ Cloud 🔒", "mod_cloud")
-        ],
-        [
-          Markup.button.callback("👁 Моніторинг", "monitoring"),
-          Markup.button.callback("📄 Звіти", "reports"),
-          Markup.button.callback("📊 Історія", "history")
-        ],
-        [
-          Markup.button.callback("⚙️ Налашт.", "settings"),
-          Markup.button.callback("💳 Преміум", "upgrade"),
-          Markup.button.callback("📣 Реферали", "referrals")
-        ],
-        [
-          Markup.button.callback("🎁 Купон", "coupon"),
-          Markup.button.callback("🎮 Досягнення", "achievements")
-        ],
-        [
-          Markup.button.url("🖥️ Веб-панель", webUrl)
-        ]
-      ]));
+      if (isEdit) {
+        await ctx.editMessageText(dashboardText, keyboard);
+      } else {
+        await ctx.reply(dashboardText, keyboard);
+      }
     } catch {
-      await ctx.reply(dashboardText, Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-          Markup.button.callback("💰 Гаманець", "mod_wallet"),
-          Markup.button.callback("📱 Телефон", "mod_phone")
-        ],
-        [
-          Markup.button.callback("📧 Email", "mod_email"),
-          Markup.button.callback("🏢 Домен", "mod_business"),
-          Markup.button.callback("🔗 URL", "mod_url")
-        ],
-        [
-          Markup.button.callback("👁 Моніторинг", "monitoring"),
-          Markup.button.callback("📄 Звіти", "reports"),
-          Markup.button.callback("⚙️ Налашт.", "settings")
-        ],
-        [
-          Markup.button.callback("💳 Преміум", "upgrade"),
-          Markup.button.callback("📣 Реферали", "referrals")
-        ],
-        [
-          Markup.button.url("🖥️ Веб-панель", webUrl)
-        ]
-      ]));
+      await ctx.reply(dashboardText, keyboard);
     }
+  }
+
+  bot.action(["dashboard", "back_to_dashboard"], async (ctx) => {
+    const tgId = ctx.from!.id.toString();
+    await showDashboard(ctx, tgId, true);
   });
 
-  // /menu command
   bot.command("menu", async (ctx) => {
     const tgId = ctx.from!.id.toString();
-    const user = await storage.getUserByTgId(tgId);
-    
-    const dashboardText = `🌑 DARKSHARE Панель
-
-📊 Запитів: ${user?.requestsLeft}/15 (БЕЗКОШТОВНО)
-🔥 Серія: ${user?.streakDays} днів
-
-Обери модуль:`;
-
-    const webUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-      : "https://darkshare.replit.app";
-
-    await ctx.reply(dashboardText, Markup.inlineKeyboard([
-      [
-        Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-        Markup.button.callback("💰 Гаманець", "mod_wallet"),
-        Markup.button.callback("📱 Телефон", "mod_phone")
-      ],
-      [
-        Markup.button.callback("📧 Email", "mod_email"),
-        Markup.button.callback("🏢 Домен", "mod_business"),
-        Markup.button.callback("🔗 URL", "mod_url")
-      ],
-      [
-        Markup.button.callback("👁 Моніторинг", "monitoring"),
-        Markup.button.callback("📄 Звіти", "reports"),
-        Markup.button.callback("⚙️ Налашт.", "settings")
-      ],
-      [
-        Markup.button.url("🖥️ Веб-панель", webUrl)
-      ]
-    ]));
+    await showDashboard(ctx, tgId, false);
   });
 
-  // --- MODULES ---
-  
-  // IP/GEO Module
-  bot.action("mod_ip", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "ip", step: "input" });
-    await ctx.reply("🌐 IP/GEO Перевірка\n\nВведи IP-адресу (напр. 8.8.8.8):", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
+  const moduleActions = ["mod_ip", "mod_wallet", "mod_phone", "mod_email", "mod_business", "mod_url"];
+  const moduleMap: Record<string, string> = {
+    "mod_ip": "ip",
+    "mod_wallet": "wallet", 
+    "mod_phone": "phone",
+    "mod_email": "email",
+    "mod_business": "domain",
+    "mod_url": "url"
+  };
 
-  // Wallet Module
-  bot.action("mod_wallet", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "wallet", step: "input" });
-    await ctx.reply("💰 Гаманець/Блокчейн Перевірка\n\nВведи адресу гаманця (0x...):", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
+  for (const action of moduleActions) {
+    bot.action(action, async (ctx) => {
+      const tgId = ctx.from!.id.toString();
+      const lang = await getLang(tgId);
+      const module = moduleMap[action];
+      userStates.set(tgId, { module, step: "input" });
+      await ctx.reply(t(lang, `modulePrompts.${module}`), 
+        Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.cancel"), "back_to_dashboard")]])
+      );
+    });
+  }
 
-  // Phone Module
-  bot.action("mod_phone", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "phone", step: "input" });
-    await ctx.reply("📱 Телефон/VOIP Перевірка\n\nВведи номер телефону:", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
-
-  // Email Module
-  bot.action("mod_email", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "email", step: "input" });
-    await ctx.reply("📧 Email/Витоки Перевірка\n\nВведи email адресу:", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
-
-  // Domain/Business Module
-  bot.action("mod_business", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "domain", step: "input" });
-    await ctx.reply("🏢 Домен/Бізнес Перевірка\n\nВведи домен (напр. example.com):", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
-
-  // URL Module
-  bot.action("mod_url", async (ctx) => {
-    const tgId = ctx.from!.id.toString();
-    userStates.set(tgId, { module: "url", step: "input" });
-    await ctx.reply("🔗 URL/Посилання Перевірка\n\nВведи URL для перевірки:", 
-      Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
-    );
-  });
-
-  // Premium modules
   bot.action(["mod_cve", "mod_iot", "mod_cloud"], async (ctx) => {
-    await ctx.answerCbQuery("🔒 Premium feature!");
-    await ctx.reply("🔒 Ця функція доступна тільки для PRO користувачів.\n\nОтримай PRO для доступу до:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan", 
+    const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
+    await ctx.answerCbQuery(t(lang, "premium.locked"));
+    
+    const text = lang === "uk" 
+      ? "🔒 Ця функція доступна тільки для PRO.\n\nОтримай PRO для доступу до:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan"
+      : lang === "ru"
+      ? "🔒 Эта функция доступна только для PRO.\n\nПолучи PRO для доступа к:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan"
+      : "🔒 This feature is PRO only.\n\nGet PRO for access to:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan";
+    
+    await ctx.reply(text, 
       Markup.inlineKeyboard([
-        [Markup.button.callback("💳 Оновити до PRO", "upgrade")],
-        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
+        [Markup.button.callback(t(lang, "upgrade.buyPro"), "upgrade")],
+        [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
       ])
     );
   });
 
-  // --- TEXT INPUT HANDLER ---
   bot.on("text", async (ctx) => {
     const text = ctx.message.text;
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
     const state = userStates.get(tgId);
 
-    // Handle payment tx hash
     if (state?.module === "payment" && state?.step === "awaiting_proof") {
       if (!user) return;
       
@@ -300,29 +260,18 @@ Join 100k+ юзерів!`;
 
       userStates.delete(tgId);
 
-      await ctx.reply(`✅ Запит на оплату #${payment.id} створено!
-
-Тариф: ${state.data.tier}
-Сума: $${state.data.amount} USDT
-TX Hash: ${txHash}
-
-Очікуйте підтвердження від модератора.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+      await ctx.reply(t(lang, "payment.created", { id: payment.id.toString() }) + `\n\n${lang === "uk" ? "Тариф" : lang === "ru" ? "Тариф" : "Tier"}: ${state.data.tier}\n${lang === "uk" ? "Сума" : lang === "ru" ? "Сумма" : "Amount"}: $${state.data.amount} USDT\nTX Hash: ${txHash}\n\n${t(lang, "payment.pending")}`, 
+        Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
         try {
-          await ctx.telegram.sendMessage(adminId, `💳 Нова оплата #${payment.id}
-
-Користувач: @${user.username} (ID: ${user.tgId})
-Тариф: ${state.data.tier}
-Сума: $${state.data.amount} USDT
-TX Hash: ${txHash}`, 
+          await ctx.telegram.sendMessage(adminId, t("uk", "admin.newPayment", { id: payment.id.toString() }) + `\n\n${t("uk", "admin.user", { username: user.username || "N/A", tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\nTX Hash: ${txHash}`, 
             {
               reply_markup: Markup.inlineKeyboard([
                 [
-                  Markup.button.callback("✅ Прийняти", `approve_pay_${payment.id}`),
-                  Markup.button.callback("❌ Відхилити", `reject_pay_${payment.id}`)
+                  Markup.button.callback(t("uk", "admin.approve"), `approve_pay_${payment.id}`),
+                  Markup.button.callback(t("uk", "admin.reject"), `reject_pay_${payment.id}`)
                 ]
               ]).reply_markup
             }
@@ -334,54 +283,54 @@ TX Hash: ${txHash}`,
       return;
     }
 
-    // Check requests limit
     if (user && user.requestsLeft! <= 0) {
-      return ctx.reply("❌ Ліміт запитів вичерпано!\n\nОтримай PRO для безлімітних перевірок.", 
+      return ctx.reply(t(lang, "validation.limitReached", { limit: "15" }), 
         Markup.inlineKeyboard([
-          [Markup.button.callback("💳 Преміум", "upgrade")],
-          [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
+          [Markup.button.callback(t(lang, "buttons.upgrade"), "upgrade")],
+          [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
         ])
       );
     }
 
     if (!state || !state.module) {
-      // No active state - show help
-      return ctx.reply("Використай /menu для вибору модуля перевірки.");
+      const helpText = lang === "uk" 
+        ? "Використай /menu для вибору модуля."
+        : lang === "ru"
+        ? "Используй /menu для выбора модуля."
+        : "Use /menu to select a module.";
+      return ctx.reply(helpText);
     }
 
-    // Process based on module
     const inputValue = text.trim();
     
-    // Validate input based on module type
     switch (state.module) {
       case "ip":
         if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(inputValue)) {
-          return ctx.reply("❌ Невірний формат IP.\nПриклад: 8.8.8.8\n\nСпробуй ще раз:");
+          return ctx.reply(t(lang, "validation.invalidIp"));
         }
         break;
       case "wallet":
         if (!inputValue.startsWith("0x") || inputValue.length < 20) {
-          return ctx.reply("❌ Невірний формат гаманця.\nПриклад: 0x1234...abcd\n\nСпробуй ще раз:");
+          return ctx.reply(t(lang, "validation.invalidWallet"));
         }
         break;
       case "email":
         if (!inputValue.includes("@")) {
-          return ctx.reply("❌ Невірний email.\nПриклад: user@example.com\n\nСпробуй ще раз:");
+          return ctx.reply(t(lang, "validation.invalidEmail"));
         }
         break;
     }
     
-    // Perform the actual check using checkService
     let checkResult: CheckResult;
     try {
-      await ctx.reply("🔄 Аналізую дані...");
+      const analyzingText = lang === "uk" ? "🔄 Аналізую дані..." : lang === "ru" ? "🔄 Анализирую данные..." : "🔄 Analyzing data...";
+      await ctx.reply(analyzingText);
       checkResult = await performCheck(state.module, inputValue);
     } catch (error: any) {
       console.error("Check error:", error);
-      return ctx.reply(`❌ Помилка аналізу: ${error.message}\n\nСпробуй ще раз.`);
+      return ctx.reply(t(lang, "validation.error", { error: error.message }));
     }
     
-    // Format risk level emoji
     const getRiskEmoji = (level: string) => {
       switch (level) {
         case "low": return "🟢";
@@ -391,232 +340,249 @@ TX Hash: ${txHash}`,
         default: return "🟡";
       }
     };
-    
-    const riskEmoji = getRiskEmoji(checkResult.riskLevel);
-    
-    // Format findings
-    const findingsText = checkResult.findings.slice(0, 5).map(f => `• ${f}`).join("\n");
-    
-    // Build result message
+
     const moduleEmojis: Record<string, string> = {
-      ip: "🌐", wallet: "💰", phone: "📱", email: "📧", domain: "🏢", url: "🔗"
+      ip: "🌐", wallet: "💰", phone: "📱", 
+      email: "📧", domain: "🏢", url: "🔗"
     };
     
-    const result = `${moduleEmojis[state.module] || "🔍"} ${checkResult.type.toUpperCase()} Аналіз: ${checkResult.target.substring(0, 30)}${checkResult.target.length > 30 ? "..." : ""}
-${riskEmoji} Ризик: ${checkResult.riskLevel.toUpperCase()} (${checkResult.riskScore}/100)
+    const riskEmoji = getRiskEmoji(checkResult.riskLevel);
+    const findingsText = checkResult.findings.slice(0, 5).map(f => `• ${f}`).join("\n");
+    
+    const riskWord = lang === "uk" ? "Ризик" : lang === "ru" ? "Риск" : "Risk";
+    const findingsWord = lang === "uk" ? "Знахідки" : lang === "ru" ? "Находки" : "Findings";
+    const sourcesWord = lang === "uk" ? "Джерела" : lang === "ru" ? "Источники" : "Sources";
 
-📋 Знахідки:
+    const result = `${moduleEmojis[state.module] || "🔍"} ${checkResult.type.toUpperCase()} ${t(lang, "result.analysis")}: ${checkResult.target.substring(0, 30)}${checkResult.target.length > 30 ? "..." : ""}
+${riskEmoji} ${riskWord}: ${checkResult.riskLevel.toUpperCase()} (${checkResult.riskScore}/100)
+
+📋 ${findingsWord}:
 ${findingsText}
 
-📊 Джерела: ${checkResult.sources.join(", ")}`;
+📊 ${sourcesWord}: ${checkResult.sources.join(", ")}`;
 
-    // Clear state
+    if (user) {
+      await storage.updateUser(user.id, { requestsLeft: Math.max(0, (user.requestsLeft || 15) - 1) });
+      
+      await storage.createReport({
+        userId: user.id,
+        objectType: state.module,
+        dataJson: checkResult,
+      });
+    }
+
     userStates.delete(tgId);
 
-    // Decrement requests
-    if (user) {
-      await storage.updateUser(user.id, { requestsLeft: user.requestsLeft! - 1 });
-    }
-
-    // Send result with action buttons
-    await ctx.reply(result, Markup.inlineKeyboard([
-      [
-        Markup.button.callback("🔄 Повторити", `mod_${state.module}`),
-        Markup.button.callback("📄 PDF", `gen_pdf_${state.module}_${inputValue}`)
-      ],
-      [
-        Markup.button.callback("👁 Моніторинг", `add_monitor_${state.module}_${inputValue}`),
-        Markup.button.callback("⚠️ Поділитися", `share_${state.module}`)
-      ],
-      [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
-    ]));
+    await ctx.reply(result, 
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback(t(lang, "buttons.pdf"), `gen_pdf_${state.module}_${inputValue}`),
+          Markup.button.callback(t(lang, "buttons.newCheck"), `mod_${state.module === "domain" ? "business" : state.module}`)
+        ],
+        [
+          Markup.button.callback(t(lang, "buttons.monitoring"), `add_monitor_${state.module}_${inputValue}`),
+          Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")
+        ]
+      ])
+    );
   });
 
-  // --- PDF Generation ---
   bot.action(/^gen_pdf_/, async (ctx) => {
-    await ctx.answerCbQuery("Генерую професійний PDF...");
-    
     const parts = ctx.match.input.split('_');
-    const moduleType = parts[2];
-    const value = parts.slice(3).join('_');
-    const tgId = ctx.from!.id.toString();
-
-    // Generate random but consistent risk data
-    const riskScore = Math.floor(Math.random() * 100);
-    const riskLevel: "low" | "medium" | "high" | "critical" = 
-      riskScore >= 80 ? "critical" :
-      riskScore >= 60 ? "high" :
-      riskScore >= 30 ? "medium" : "low";
-
-    const sources = {
-      ip: ["AbuseIPDB", "IPInfo", "MaxMind", "Shodan", "VirusTotal"],
-      wallet: ["Etherscan", "Chainalysis", "CipherTrace", "OFAC", "EU Sanctions"],
-      phone: ["NumVerify", "Twilio", "CallerID", "SpamDB"],
-      email: ["HaveIBeenPwned", "Hunter.io", "EmailRep", "SpamHaus"],
-      domain: ["WHOIS", "SSL Labs", "DNSDumpster", "OFAC", "EU Registry"],
-      url: ["VirusTotal", "Google Safe Browsing", "PhishTank", "URLVoid"],
-    }[moduleType] || ["DARKSHARE Intel"];
-
-    try {
-      const pdfBuffer = await generateDetailedPDF({
-        moduleType,
-        targetValue: value,
-        riskLevel,
-        riskScore,
-        timestamp: new Date(),
-        userId: tgId,
-        findings: generateFindings(moduleType, riskLevel),
-        sources,
-        metadata: generateMetadata(moduleType),
-      });
-
-      await ctx.replyWithDocument(
-        { source: pdfBuffer, filename: `DARKSHARE_${moduleType.toUpperCase()}_${Date.now()}.pdf` },
-        { 
-          caption: `📄 Професійний звіт готовий!\n\n🎯 Ціль: ${value.substring(0, 30)}...\n📊 Оцінка ризику: ${riskScore}/100 (${riskLevel.toUpperCase()})\n\n⚠️ КОНФІДЕНЦІЙНО - Не розповсюджувати`,
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback("🔄 Нова перевірка", `mod_${moduleType}`)],
-            [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
-          ])
-        }
-      );
-    } catch (err) {
-      console.error("PDF generation error:", err);
-      await ctx.reply("❌ Помилка генерації PDF. Спробуй ще раз.", 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
-      );
-    }
-  });
-
-  // --- Add to Monitoring ---
-  bot.action(/^add_monitor_/, async (ctx) => {
-    const parts = ctx.match.input.split('_');
-    const objectType = parts[2];
-    const value = parts.slice(3).join('_');
+    const module = parts[2];
+    const target = parts.slice(3).join('_');
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
+    
+    if (!user) return ctx.answerCbQuery("Error");
 
-    if (user) {
-      await storage.createWatch({
-        userId: user.id,
-        objectType,
-        value,
-        thresholdsJson: { scoreThreshold: 50 },
-        status: "active"
+    try {
+      const generatingText = lang === "uk" ? "📄 Генерую PDF..." : lang === "ru" ? "📄 Генерирую PDF..." : "📄 Generating PDF...";
+      await ctx.answerCbQuery(generatingText);
+      
+      const checkResult = await performCheck(module, target);
+      const findings = generateFindings(module, checkResult.riskLevel);
+      const metadata = generateMetadata(module);
+      
+      const pdfBuffer = await generateDetailedPDF({
+        moduleType: module,
+        targetValue: target,
+        riskLevel: checkResult.riskLevel as "low" | "medium" | "high" | "critical",
+        riskScore: checkResult.riskScore,
+        timestamp: new Date(),
+        userId: user.id.toString(),
+        findings,
+        sources: checkResult.sources,
+        metadata
       });
-      await ctx.answerCbQuery("✅ Додано до моніторингу!");
-      await ctx.reply(`👁 ${value.substring(0, 20)}... додано до watchlist!\n\nПеревірка кожні 5 хв. Алерти увімкнено.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
-      );
+
+      const filename = `darkshare_${module}_${Date.now()}.pdf`;
+      
+      await ctx.replyWithDocument({
+        source: pdfBuffer,
+        filename: filename
+      });
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      const errorText = lang === "uk" ? "❌ Помилка генерації PDF" : lang === "ru" ? "❌ Ошибка генерации PDF" : "❌ PDF generation error";
+      await ctx.reply(errorText);
     }
   });
 
-  // --- Monitoring View ---
+  bot.action(/^add_monitor_/, async (ctx) => {
+    const parts = ctx.match.input.split('_');
+    const module = parts[2];
+    const target = parts.slice(3).join('_');
+    const tgId = ctx.from!.id.toString();
+    const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
+    
+    if (!user) return ctx.answerCbQuery("Error");
+
+    const existingWatches = await storage.getWatches(user.id);
+    const watchLimit = user.tier === "FREE" ? 1 : 999;
+    
+    if (existingWatches.length >= watchLimit) {
+      await ctx.answerCbQuery(t(lang, "monitoring.limitReached"));
+      return ctx.reply(t(lang, "monitoring.upgradeHint"), 
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t(lang, "upgrade.buyPro"), "upgrade")],
+          [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
+        ])
+      );
+    }
+
+    await storage.createWatch({
+      userId: user.id,
+      objectType: module,
+      value: target,
+      status: "low",
+      alertsOn: true,
+    });
+
+    await ctx.answerCbQuery(t(lang, "monitoring.added"));
+    await ctx.reply(t(lang, "monitoring.added") + "\n\n" + t(lang, "monitoring.description"), 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
+    );
+  });
+
   bot.action("monitoring", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
-
+    const lang = getUserLang(user?.lang);
+    
     if (!user) return;
 
     const watches = await storage.getWatches(user.id);
-
+    
+    const title = t(lang, "monitoring.title");
+    let text = `${title}\n\n`;
+    
     if (watches.length === 0) {
-      await ctx.editMessageText("👁 Watchlist порожній\n\nДодай об'єкти після перевірки.", 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
-      );
-      return;
+      text += lang === "uk" 
+        ? "(Порожньо)\n\nДодай об'єкт після перевірки."
+        : lang === "ru"
+        ? "(Пусто)\n\nДобавь объект после проверки."
+        : "(Empty)\n\nAdd an object after a check.";
+    } else {
+      watches.forEach((w, i) => {
+        const statusEmoji = w.status === "low" ? "🟢" : w.status === "medium" ? "🟡" : "🔴";
+        text += `${i + 1}. ${statusEmoji} ${w.objectType}: ${w.value}\n`;
+      });
     }
 
-    let watchlistText = "👁 Your Watchlist:\n\n";
-    watches.forEach((w, i) => {
-      const status = w.status === "high" ? "🔴" : w.status === "medium" ? "🟡" : "🟢";
-      watchlistText += `${i + 1}. ${w.objectType}: ${w.value.substring(0, 15)}... ${status}\n`;
-    });
-
-    await ctx.editMessageText(watchlistText, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+    await ctx.editMessageText(text, 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
     );
   });
 
-  // --- Звіти ---
   bot.action("reports", async (ctx) => {
-    await ctx.editMessageText("📄 Звіти\n\nТвої попередні звіти будуть тут.\n(Звіти не зберігаються - GDPR)", 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+    const tgId = ctx.from!.id.toString();
+    const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
+    
+    if (!user) return;
+
+    const reports = await storage.getReports(user.id);
+    
+    const title = lang === "uk" ? "📄 Звіти" : lang === "ru" ? "📄 Отчёты" : "📄 Reports";
+    let text = `${title}\n\n`;
+    
+    if (reports.length === 0) {
+      text += lang === "uk" 
+        ? "(Порожньо)\n\nПроведи перевірку для створення звіту."
+        : lang === "ru"
+        ? "(Пусто)\n\nПроведи проверку для создания отчёта."
+        : "(Empty)\n\nRun a check to create a report.";
+    } else {
+      reports.slice(0, 10).forEach((r, i) => {
+        const date = r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "N/A";
+        text += `${i + 1}. ${r.objectType.toUpperCase()} - ${date}\n`;
+      });
+    }
+
+    await ctx.editMessageText(text, 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
     );
   });
 
-  // --- Налаштування ---
   bot.action("settings", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
 
-    await ctx.editMessageText(`⚙️ Налаштування
+    const text = `${t(lang, "settings.title")}\n\n${t(lang, "settings.language", { lang: languageNames[lang] })}\n\n${t(lang, "settings.selectLanguage")}`;
 
-🌐 Мова: ${user?.lang || 'UA'}
-🎨 Тема: ${user?.theme || 'Dark'}
-🔔 Сповіщення: ${user?.notifsOn ? 'On' : 'Off'}
-📊 Дайджести: ${user?.digestsOn ? 'On' : 'Off'}`, 
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🇺🇦 UA", "set_lang_ua"),
-          Markup.button.callback("🇬🇧 EN", "set_lang_en")
-        ],
-        [
-          Markup.button.callback("🔔 Toggle Notifs", "toggle_notifs"),
-          Markup.button.callback("📊 Toggle Digest", "toggle_digest")
-        ],
-        [Markup.button.callback("🚪 Delete My Data", "delete_data")],
-        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
-      ])
-    );
+    await ctx.editMessageText(text, Markup.inlineKeyboard([
+      [
+        Markup.button.callback("🇺🇦 Українська", "set_lang_uk"),
+        Markup.button.callback("🇬🇧 English", "set_lang_en"),
+        Markup.button.callback("🇷🇺 Русский", "set_lang_ru")
+      ],
+      [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
+    ]));
   });
 
-  // --- Referrals ---
+  bot.action(/^set_lang_/, async (ctx) => {
+    const newLang = ctx.match.input.split('_')[2] as Language;
+    const tgId = ctx.from!.id.toString();
+    const user = await storage.getUserByTgId(tgId);
+    
+    if (user) {
+      await storage.updateUser(user.id, { lang: newLang });
+    }
+    
+    await ctx.answerCbQuery(t(newLang, "settings.languageChanged"));
+    await showDashboard(ctx, tgId, true);
+  });
+
   bot.action("referrals", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
+    const lang = getUserLang(user?.lang);
 
-    await ctx.editMessageText(`📣 Реферальна програма
+    const text = `${t(lang, "referrals.title")}\n\n${t(lang, "referrals.yourCode", { code: user?.refCode || "N/A" })}\n${t(lang, "referrals.link", { code: user?.refCode || "N/A" })}\n\n${t(lang, "referrals.count", { count: "0" })}\n${t(lang, "referrals.earnings", { amount: "0" })}\n\n${t(lang, "referrals.invite")}`;
 
-Твій код: ${user?.refCode}
-Посилання: t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}
-
-Рефералів: 0/5 (до -20% знижки)
-Заробіток: 0 USDT
-
-Запроси друзів та отримуй бонуси!`, 
+    await ctx.editMessageText(text, 
       Markup.inlineKeyboard([
-        [Markup.button.url("📤 Поділитися", `https://t.me/share/url?url=t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}`)],
-        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
+        [Markup.button.url(t(lang, "buttons.share"), `https://t.me/share/url?url=t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}`)],
+        [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
       ])
     );
   });
 
-  // --- Upgrade ---
   bot.action("upgrade", async (ctx) => {
-    await ctx.editMessageText(`💳 Тарифні плани
+    const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
 
-🆓 БЕЗКОШТОВНО (Поточний)
-• 15 запитів/день
-• Базові модулі
-• 1 об'єкт моніторингу
+    const text = `${t(lang, "upgrade.title")}\n\n${t(lang, "upgrade.free")}\n${t(lang, "upgrade.freeDetails")}\n\n${t(lang, "upgrade.pro")}\n${t(lang, "upgrade.proDetails")}\n\n${t(lang, "upgrade.enterprise")}\n${t(lang, "upgrade.enterpriseDetails")}`;
 
-⭐ PRO - $10/місяць
-• Безлімітні запити
-• Всі модулі (CVE, IoT, Cloud)
-• Безлімітний моніторинг
-• PDF без водяного знаку
-• Пріоритетна підтримка
-
-💎 ENTERPRISE - $50/місяць
-• Все з PRO
-• API доступ
-• SIEM інтеграція
-• Персональна підтримка`, 
+    await ctx.editMessageText(text, 
       Markup.inlineKeyboard([
-        [Markup.button.callback("⭐ Купити PRO $10", "buy_pro")],
-        [Markup.button.callback("💎 Купити ENTERPRISE $50", "buy_enterprise")],
-        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
+        [Markup.button.callback(t(lang, "upgrade.buyPro"), "buy_pro")],
+        [Markup.button.callback(t(lang, "upgrade.buyEnterprise"), "buy_enterprise")],
+        [Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]
       ])
     );
   });
@@ -625,27 +591,17 @@ ${findingsText}
     const tier = ctx.match.input === "buy_pro" ? "PRO" : "ENTERPRISE";
     const amount = tier === "PRO" ? "10" : "50";
     const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
 
     userStates.set(tgId, { module: "payment", step: "awaiting_proof", data: { tier, amount } });
 
-    await ctx.reply(`💳 Оплата ${tier}
+    const text = `${t(lang, "payment.title", { tier })}\n\n${t(lang, "payment.amount", { amount })}\n\n${t(lang, "payment.address")}\n\n${t(lang, "payment.instructions")}`;
 
-Сума: $${amount} USDT (TRC20)
-
-Адреса: TRYbty7cEgk4ioFqBt5x5aFwqowhk7hJAm
-
-Після оплати надішли:
-• TX Hash (текстом)
-• АБО скріншот оплати
-
-Твій запит буде перевірено модератором.`, 
-      Markup.inlineKeyboard([
-        [Markup.button.callback("❌ Скасувати", "back_to_dashboard")]
-      ])
+    await ctx.reply(text, 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.cancel"), "back_to_dashboard")]])
     );
   });
 
-  // Handle photo for payment proof
   bot.on("photo", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     const state = userStates.get(tgId);
@@ -653,6 +609,7 @@ ${findingsText}
     if (state?.module === "payment" && state?.step === "awaiting_proof") {
       const user = await storage.getUserByTgId(tgId);
       if (!user) return;
+      const lang = getUserLang(user.lang);
 
       const photo = ctx.message.photo[ctx.message.photo.length - 1];
       const fileId = photo.file_id;
@@ -667,28 +624,18 @@ ${findingsText}
 
       userStates.delete(tgId);
 
-      await ctx.reply(`✅ Запит на оплату #${payment.id} створено!
-
-Тариф: ${state.data.tier}
-Сума: $${state.data.amount} USDT
-
-Очікуйте підтвердження від модератора.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+      await ctx.reply(`${t(lang, "payment.created", { id: payment.id.toString() })}\n\n${lang === "uk" ? "Тариф" : lang === "ru" ? "Тариф" : "Tier"}: ${state.data.tier}\n${lang === "uk" ? "Сума" : lang === "ru" ? "Сумма" : "Amount"}: $${state.data.amount} USDT\n\n${t(lang, "payment.pending")}`, 
+        Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
         try {
           await ctx.telegram.sendPhoto(adminId, fileId, {
-            caption: `💳 Нова оплата #${payment.id}
-
-Користувач: @${user.username} (ID: ${user.tgId})
-Тариф: ${state.data.tier}
-Сума: $${state.data.amount} USDT
-Тип: Скріншот`,
+            caption: `${t("uk", "admin.newPayment", { id: payment.id.toString() })}\n\n${t("uk", "admin.user", { username: user.username || "N/A", tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\n${t("uk", "admin.type", { type: lang === "uk" ? "Скріншот" : lang === "ru" ? "Скриншот" : "Screenshot" })}`,
             reply_markup: Markup.inlineKeyboard([
               [
-                Markup.button.callback("✅ Прийняти", `approve_pay_${payment.id}`),
-                Markup.button.callback("❌ Відхилити", `reject_pay_${payment.id}`)
+                Markup.button.callback(t("uk", "admin.approve"), `approve_pay_${payment.id}`),
+                Markup.button.callback(t("uk", "admin.reject"), `reject_pay_${payment.id}`)
               ]
             ]).reply_markup
           });
@@ -699,171 +646,128 @@ ${findingsText}
     }
   });
 
-  // Handle payment approval/rejection
   bot.action(/^approve_pay_(\d+)$/, async (ctx) => {
     const adminTgId = ctx.from!.id.toString();
-    if (!ADMIN_IDS.includes(adminTgId)) {
-      return ctx.answerCbQuery("Доступ заборонено");
-    }
-
     const paymentId = parseInt(ctx.match[1]);
-    const payment = await storage.getPaymentById(paymentId);
     
+    const payment = await storage.getPaymentById(paymentId);
     if (!payment) {
-      return ctx.answerCbQuery("Платіж не знайдено");
+      return ctx.answerCbQuery("Payment not found");
     }
 
     if (payment.status !== "pending") {
-      return ctx.answerCbQuery("Платіж вже оброблено");
+      return ctx.answerCbQuery(t("uk", "payment.alreadyProcessed"));
     }
 
     await storage.updatePaymentStatus(paymentId, "approved");
-
+    
     const user = await storage.getUserById(payment.userId!);
     if (user) {
-      const requestsToAdd = payment.tier === "PRO" ? 100 : 500;
-      await storage.updateUser(user.id, { 
-        tier: payment.tier,
-        requestsLeft: (user.requestsLeft || 0) + requestsToAdd
-      });
-
+      const newTier = payment.tier;
+      await storage.updateUser(user.id, { tier: newTier, requestsLeft: 9999 });
+      
+      const userLang = getUserLang(user.lang);
+      const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+      
       try {
-        await ctx.telegram.sendMessage(user.tgId, `🎉 Оплату #${paymentId} підтверджено!
-
-Ваш тариф: ${payment.tier}
-Додано запитів: ${requestsToAdd}
-
-Дякуємо за підтримку!`, 
-          Markup.inlineKeyboard([[Markup.button.callback("🚀 Панель", "dashboard")]])
+        await ctx.telegram.sendMessage(user.tgId, t(userLang, "payment.approved", { id: paymentId.toString(), tier: newTier, expiry }), 
+          Markup.inlineKeyboard([[Markup.button.callback(t(userLang, "buttons.back"), "back_to_dashboard")]])
         );
       } catch (e) {
         console.log(`Failed to notify user:`, e);
       }
     }
 
-    await ctx.editMessageCaption(`✅ ПІДТВЕРДЖЕНО модератором @${ctx.from!.username}
-
-Платіж #${paymentId}
-Користувач: ${user?.username}
-Тариф: ${payment.tier}`);
-    await ctx.answerCbQuery("Платіж підтверджено!");
+    await ctx.editMessageCaption(`${t("uk", "admin.approved", { admin: ctx.from!.username || "Admin" })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || "N/A", tgId: user?.tgId || "N/A" })}`);
+    await ctx.answerCbQuery("Approved!");
   });
 
   bot.action(/^reject_pay_(\d+)$/, async (ctx) => {
-    const adminTgId = ctx.from!.id.toString();
-    if (!ADMIN_IDS.includes(adminTgId)) {
-      return ctx.answerCbQuery("Доступ заборонено");
-    }
-
     const paymentId = parseInt(ctx.match[1]);
-    const payment = await storage.getPaymentById(paymentId);
     
+    const payment = await storage.getPaymentById(paymentId);
     if (!payment) {
-      return ctx.answerCbQuery("Платіж не знайдено");
+      return ctx.answerCbQuery("Payment not found");
     }
 
     if (payment.status !== "pending") {
-      return ctx.answerCbQuery("Платіж вже оброблено");
+      return ctx.answerCbQuery(t("uk", "payment.alreadyProcessed"));
     }
 
     await storage.updatePaymentStatus(paymentId, "rejected");
 
     const user = await storage.getUserById(payment.userId!);
     if (user) {
+      const userLang = getUserLang(user.lang);
       try {
-        await ctx.telegram.sendMessage(user.tgId, `❌ Оплату #${paymentId} відхилено.
-
-Можливі причини:
-• Неправильна сума
-• Невідповідний скріншот
-• Транзакцію не знайдено
-
-Зверніться до підтримки для уточнення.`, 
-          Markup.inlineKeyboard([[Markup.button.callback("💳 Спробувати ще", "upgrade")]])
+        await ctx.telegram.sendMessage(user.tgId, t(userLang, "payment.rejected", { id: paymentId.toString() }), 
+          Markup.inlineKeyboard([[Markup.button.callback(t(userLang, "payment.tryAgain"), "upgrade")]])
         );
       } catch (e) {
         console.log(`Failed to notify user:`, e);
       }
     }
 
-    await ctx.editMessageCaption(`❌ ВІДХИЛЕНО модератором @${ctx.from!.username}
-
-Платіж #${paymentId}
-Користувач: ${user?.username}`);
-    await ctx.answerCbQuery("Платіж відхилено");
+    await ctx.editMessageCaption(`${t("uk", "admin.rejected", { admin: ctx.from!.username || "Admin" })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || "N/A", tgId: user?.tgId || "N/A" })}`);
+    await ctx.answerCbQuery("Rejected");
   });
 
-  // --- Coupon ---
   bot.action("coupon", async (ctx) => {
     const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
     userStates.set(tgId, { module: "coupon", step: "input" });
-    await ctx.reply("🎁 Введи код купону:", 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+    await ctx.reply(t(lang, "coupon.enter"), 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
     );
   });
 
-  // --- Досягнення ---
   bot.action("achievements", async (ctx) => {
-    await ctx.editMessageText(`🎮 Досягнення
+    const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
+    
+    const text = `${t(lang, "achievements.title")}\n\n${t(lang, "achievements.riskHunter", { count: "0" })}\n${t(lang, "achievements.scamSlayer", { count: "0" })}\n${t(lang, "achievements.streakMaster", { count: "0" })}\n${t(lang, "achievements.referralKing", { count: "0" })}\n\n${t(lang, "achievements.unlock")}`;
 
-🏆 Risk Hunter - 10 перевірок (0/10)
-🛡️ Scam Slayer - 50 перевірок (0/50)
-🔥 Streak Master - 7 днів поспіль (0/7)
-📣 Referral King - 5 рефералів (0/5)
-
-Розблокуй бейджі та отримуй бонусні запити!`, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+    await ctx.editMessageText(text, 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
     );
   });
 
-  // --- History ---
   bot.action("history", async (ctx) => {
-    await ctx.editMessageText(`📊 Історія/Хронологія
+    const tgId = ctx.from!.id.toString();
+    const lang = await getLang(tgId);
 
-Історія змін твоїх об'єктів:
+    const text = `${t(lang, "history.title")}\n\n${t(lang, "history.description")}\n\n${t(lang, "history.empty")}\n\n${t(lang, "history.addMonitor")}`;
 
-(Поки що порожньо)
-
-Додай об'єкти до моніторингу для відстеження змін.`, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
+    await ctx.editMessageText(text, 
+      Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
     );
   });
 
-  // --- ADMIN PANEL ---
   bot.command("admin", async (ctx) => {
     const tgId = ctx.from!.id.toString();
-    
-    // For now, allow anyone to see admin (in production, check ADMIN_IDS)
     const stats = await storage.getStats();
 
-    await ctx.reply(`🌑 АДМІН ПАНЕЛЬ
+    const text = `${t("uk", "admin.title")}\n\n${t("uk", "admin.stats")}\n${t("uk", "admin.totalUsers", { count: stats.totalUsers.toString() })}\n${t("uk", "admin.activeWatches", { count: stats.activeWatches.toString() })}\n${t("uk", "admin.mrr", { amount: "0" })}\n\n${t("uk", "admin.selectAction")}`;
 
-📊 Статистика:
-• Всього користувачів: ${stats.totalUsers}
-• Активних моніторів: ${stats.activeWatches}
-• MRR: $0
-
-Виберіть дію:`, 
+    await ctx.reply(text, 
       Markup.inlineKeyboard([
         [
-          Markup.button.callback("👥 Користувачі", "admin_users"),
-          Markup.button.callback("📊 Аналітика", "admin_analytics")
+          Markup.button.callback(t("uk", "admin.users"), "admin_users"),
+          Markup.button.callback(t("uk", "admin.analytics"), "admin_analytics")
         ],
         [
-          Markup.button.callback("📢 Розсилка", "admin_broadcast"),
-          Markup.button.callback("🎁 Купони", "admin_coupons")
+          Markup.button.callback(t("uk", "admin.broadcast"), "admin_broadcast"),
+          Markup.button.callback(t("uk", "admin.coupons"), "admin_coupons")
         ],
-        [Markup.button.callback("⬅️ Вийти", "back_to_dashboard")]
+        [Markup.button.callback(t("uk", "buttons.exit"), "back_to_dashboard")]
       ])
     );
   });
 
-  // Error handler
   bot.catch((err, ctx) => {
     console.error(`Bot error for ${ctx.updateType}:`, err);
   });
 
-  // Start bot polling (the promise only resolves when bot.stop() is called)
   console.log("Starting bot polling...");
   bot.launch({ dropPendingUpdates: true })
     .catch((err: Error) => console.error("Bot error:", err.message));

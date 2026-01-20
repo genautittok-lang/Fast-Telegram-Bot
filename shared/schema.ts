@@ -6,7 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   tgId: text("tg_id").notNull().unique(),
   username: text("username"),
-  lang: text("lang").default("UA"),
+  lang: text("lang").default("uk"),
   tier: text("tier").default("FREE"),
   requestsLeft: integer("requests_left").default(15),
   streakDays: integer("streak_days").default(0),
