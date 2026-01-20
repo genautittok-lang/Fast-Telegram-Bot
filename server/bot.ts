@@ -8,13 +8,20 @@ interface BotContext extends Context {}
 const ADMIN_IDS = ["123456789"]; // Replace with actual admin TG IDs
 
 export async function setupBot(storage: IStorage) {
+  console.log("Setting up Telegram bot...");
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn("TELEGRAM_BOT_TOKEN not set. Bot will not start.");
     return null;
   }
+  console.log("Token found, creating bot instance...");
 
   const bot = new Telegraf<BotContext>(token);
+
+  // Test bot token
+  bot.telegram.getMe()
+    .then((botInfo) => console.log("Bot info:", botInfo.username))
+    .catch((err) => console.error("Failed to get bot info:", err.message));
 
   // User state tracking for conversation flow
   const userStates: Map<string, { module?: string; step?: string; data?: any }> = new Map();
@@ -657,15 +664,19 @@ Sources: VirusTotal, Google Safe`;
     );
   });
 
-  // Start bot
-  bot.launch().then(() => {
-    console.log("Bot started successfully!");
-  }).catch(err => {
-    console.error("Bot launch failed:", err);
+  // Error handler
+  bot.catch((err, ctx) => {
+    console.error(`Bot error for ${ctx.updateType}:`, err);
   });
+
+  // Start bot polling (the promise only resolves when bot.stop() is called)
+  console.log("Starting bot polling...");
+  bot.launch({ dropPendingUpdates: true })
+    .catch((err: Error) => console.error("Bot error:", err.message));
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
+  console.log("Bot is now running and listening for messages!");
   return bot;
 }
