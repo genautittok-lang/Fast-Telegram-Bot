@@ -92,16 +92,16 @@ Join 100k+ юзерів!`;
     userStates.delete(tgId); // Clear any pending state
 
     const requestsWarning = user && user.requestsLeft! <= 3 
-      ? `\n⚠️ Мало запитів! Upgrade?` 
+      ? `\n⚠️ Мало запитів! Оновити план?` 
       : '';
 
-    const dashboardText = `🌑 DARKSHARE Dashboard
+    const dashboardText = `🌑 DARKSHARE Панель
 
-📊 Запитів: ${user?.requestsLeft}/15 (FREE)
-🔥 Streak: ${user?.streakDays} дні
-📣 Refs: 0/5 (до -20%)${requestsWarning}
+📊 Запитів: ${user?.requestsLeft}/15 (БЕЗКОШТОВНО)
+🔥 Серія: ${user?.streakDays} днів
+📣 Реферали: 0/5 (до -20%)${requestsWarning}
 
-Daily tip: Check IP на blacklists!
+💡 Порада дня: Перевіряй IP на чорних списках!
 
 Обери модуль:`;
 
@@ -113,12 +113,12 @@ Daily tip: Check IP на blacklists!
       await ctx.editMessageText(dashboardText, Markup.inlineKeyboard([
         [
           Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-          Markup.button.callback("💰 Wallet", "mod_wallet"),
-          Markup.button.callback("📱 Phone", "mod_phone")
+          Markup.button.callback("💰 Гаманець", "mod_wallet"),
+          Markup.button.callback("📱 Телефон", "mod_phone")
         ],
         [
           Markup.button.callback("📧 Email", "mod_email"),
-          Markup.button.callback("🏢 Domain", "mod_business"),
+          Markup.button.callback("🏢 Домен", "mod_business"),
           Markup.button.callback("🔗 URL", "mod_url")
         ],
         [
@@ -127,46 +127,46 @@ Daily tip: Check IP на blacklists!
           Markup.button.callback("☁️ Cloud 🔒", "mod_cloud")
         ],
         [
-          Markup.button.callback("👁 Monitoring", "monitoring"),
-          Markup.button.callback("📄 Reports", "reports"),
-          Markup.button.callback("📊 History", "history")
+          Markup.button.callback("👁 Моніторинг", "monitoring"),
+          Markup.button.callback("📄 Звіти", "reports"),
+          Markup.button.callback("📊 Історія", "history")
         ],
         [
-          Markup.button.callback("⚙️ Settings", "settings"),
-          Markup.button.callback("💳 Upgrade", "upgrade"),
-          Markup.button.callback("📣 Referrals", "referrals")
+          Markup.button.callback("⚙️ Налашт.", "settings"),
+          Markup.button.callback("💳 Преміум", "upgrade"),
+          Markup.button.callback("📣 Реферали", "referrals")
         ],
         [
-          Markup.button.callback("🎁 Coupon", "coupon"),
-          Markup.button.callback("🎮 Achievements", "achievements")
+          Markup.button.callback("🎁 Купон", "coupon"),
+          Markup.button.callback("🎮 Досягнення", "achievements")
         ],
         [
-          Markup.button.url("🖥️ Web Dashboard", webUrl)
+          Markup.button.url("🖥️ Веб-панель", webUrl)
         ]
       ]));
     } catch {
       await ctx.reply(dashboardText, Markup.inlineKeyboard([
         [
           Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-          Markup.button.callback("💰 Wallet", "mod_wallet"),
-          Markup.button.callback("📱 Phone", "mod_phone")
+          Markup.button.callback("💰 Гаманець", "mod_wallet"),
+          Markup.button.callback("📱 Телефон", "mod_phone")
         ],
         [
           Markup.button.callback("📧 Email", "mod_email"),
-          Markup.button.callback("🏢 Domain", "mod_business"),
+          Markup.button.callback("🏢 Домен", "mod_business"),
           Markup.button.callback("🔗 URL", "mod_url")
         ],
         [
-          Markup.button.callback("👁 Monitoring", "monitoring"),
-          Markup.button.callback("📄 Reports", "reports"),
-          Markup.button.callback("⚙️ Settings", "settings")
+          Markup.button.callback("👁 Моніторинг", "monitoring"),
+          Markup.button.callback("📄 Звіти", "reports"),
+          Markup.button.callback("⚙️ Налашт.", "settings")
         ],
         [
-          Markup.button.callback("💳 Upgrade", "upgrade"),
-          Markup.button.callback("📣 Referrals", "referrals")
+          Markup.button.callback("💳 Преміум", "upgrade"),
+          Markup.button.callback("📣 Реферали", "referrals")
         ],
         [
-          Markup.button.url("🖥️ Web Dashboard", webUrl)
+          Markup.button.url("🖥️ Веб-панель", webUrl)
         ]
       ]));
     }
@@ -177,10 +177,10 @@ Daily tip: Check IP на blacklists!
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
     
-    const dashboardText = `🌑 DARKSHARE Dashboard
+    const dashboardText = `🌑 DARKSHARE Панель
 
-📊 Запитів: ${user?.requestsLeft}/15 (FREE)
-🔥 Streak: ${user?.streakDays} дні
+📊 Запитів: ${user?.requestsLeft}/15 (БЕЗКОШТОВНО)
+🔥 Серія: ${user?.streakDays} днів
 
 Обери модуль:`;
 
@@ -191,21 +191,21 @@ Daily tip: Check IP на blacklists!
     await ctx.reply(dashboardText, Markup.inlineKeyboard([
       [
         Markup.button.callback("🌐 IP/GEO", "mod_ip"),
-        Markup.button.callback("💰 Wallet", "mod_wallet"),
-        Markup.button.callback("📱 Phone", "mod_phone")
+        Markup.button.callback("💰 Гаманець", "mod_wallet"),
+        Markup.button.callback("📱 Телефон", "mod_phone")
       ],
       [
         Markup.button.callback("📧 Email", "mod_email"),
-        Markup.button.callback("🏢 Domain", "mod_business"),
+        Markup.button.callback("🏢 Домен", "mod_business"),
         Markup.button.callback("🔗 URL", "mod_url")
       ],
       [
-        Markup.button.callback("👁 Monitoring", "monitoring"),
-        Markup.button.callback("📄 Reports", "reports"),
-        Markup.button.callback("⚙️ Settings", "settings")
+        Markup.button.callback("👁 Моніторинг", "monitoring"),
+        Markup.button.callback("📄 Звіти", "reports"),
+        Markup.button.callback("⚙️ Налашт.", "settings")
       ],
       [
-        Markup.button.url("🖥️ Web Dashboard", webUrl)
+        Markup.button.url("🖥️ Веб-панель", webUrl)
       ]
     ]));
   });
@@ -271,8 +271,8 @@ Daily tip: Check IP на blacklists!
     await ctx.answerCbQuery("🔒 Premium feature!");
     await ctx.reply("🔒 Ця функція доступна тільки для PRO користувачів.\n\nОтримай PRO для доступу до:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan", 
       Markup.inlineKeyboard([
-        [Markup.button.callback("💳 Upgrade to PRO", "upgrade")],
-        [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+        [Markup.button.callback("💳 Оновити до PRO", "upgrade")],
+        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
   });
@@ -307,7 +307,7 @@ Daily tip: Check IP на blacklists!
 TX Hash: ${txHash}
 
 Очікуйте підтвердження від модератора.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
@@ -338,8 +338,8 @@ TX Hash: ${txHash}`,
     if (user && user.requestsLeft! <= 0) {
       return ctx.reply("❌ Ліміт запитів вичерпано!\n\nОтримай PRO для безлімітних перевірок.", 
         Markup.inlineKeyboard([
-          [Markup.button.callback("💳 Upgrade", "upgrade")],
-          [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+          [Markup.button.callback("💳 Преміум", "upgrade")],
+          [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
         ])
       );
     }
@@ -421,14 +421,14 @@ ${findingsText}
     // Send result with action buttons
     await ctx.reply(result, Markup.inlineKeyboard([
       [
-        Markup.button.callback("🔄 Re-Check", `mod_${state.module}`),
+        Markup.button.callback("🔄 Повторити", `mod_${state.module}`),
         Markup.button.callback("📄 PDF", `gen_pdf_${state.module}_${inputValue}`)
       ],
       [
-        Markup.button.callback("👁 Monitor", `add_monitor_${state.module}_${inputValue}`),
-        Markup.button.callback("⚠️ Share", `share_${state.module}`)
+        Markup.button.callback("👁 Моніторинг", `add_monitor_${state.module}_${inputValue}`),
+        Markup.button.callback("⚠️ Поділитися", `share_${state.module}`)
       ],
-      [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+      [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
     ]));
   });
 
@@ -473,17 +473,17 @@ ${findingsText}
       await ctx.replyWithDocument(
         { source: pdfBuffer, filename: `DARKSHARE_${moduleType.toUpperCase()}_${Date.now()}.pdf` },
         { 
-          caption: `📄 Професійний звіт готовий!\n\n🎯 Ціль: ${value.substring(0, 30)}...\n📊 Risk Score: ${riskScore}/100 (${riskLevel.toUpperCase()})\n\n⚠️ CONFIDENTIAL - Do not distribute`,
+          caption: `📄 Професійний звіт готовий!\n\n🎯 Ціль: ${value.substring(0, 30)}...\n📊 Оцінка ризику: ${riskScore}/100 (${riskLevel.toUpperCase()})\n\n⚠️ КОНФІДЕНЦІЙНО - Не розповсюджувати`,
           ...Markup.inlineKeyboard([
-            [Markup.button.callback("🔄 New Check", `mod_${moduleType}`)],
-            [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+            [Markup.button.callback("🔄 Нова перевірка", `mod_${moduleType}`)],
+            [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
           ])
         }
       );
     } catch (err) {
       console.error("PDF generation error:", err);
       await ctx.reply("❌ Помилка генерації PDF. Спробуй ще раз.", 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
       );
     }
   });
@@ -506,7 +506,7 @@ ${findingsText}
       });
       await ctx.answerCbQuery("✅ Додано до моніторингу!");
       await ctx.reply(`👁 ${value.substring(0, 20)}... додано до watchlist!\n\nПеревірка кожні 5 хв. Алерти увімкнено.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
       );
     }
   });
@@ -522,7 +522,7 @@ ${findingsText}
 
     if (watches.length === 0) {
       await ctx.editMessageText("👁 Watchlist порожній\n\nДодай об'єкти після перевірки.", 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
       );
       return;
     }
@@ -534,23 +534,23 @@ ${findingsText}
     });
 
     await ctx.editMessageText(watchlistText, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
     );
   });
 
-  // --- Reports ---
+  // --- Звіти ---
   bot.action("reports", async (ctx) => {
-    await ctx.editMessageText("📄 Reports\n\nТвої попередні звіти будуть тут.\n(Звіти не зберігаються - GDPR)", 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+    await ctx.editMessageText("📄 Звіти\n\nТвої попередні звіти будуть тут.\n(Звіти не зберігаються - GDPR)", 
+      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
     );
   });
 
-  // --- Settings ---
+  // --- Налаштування ---
   bot.action("settings", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
 
-    await ctx.editMessageText(`⚙️ Settings
+    await ctx.editMessageText(`⚙️ Налаштування
 
 🌐 Мова: ${user?.lang || 'UA'}
 🎨 Тема: ${user?.theme || 'Dark'}
@@ -566,7 +566,7 @@ ${findingsText}
           Markup.button.callback("📊 Toggle Digest", "toggle_digest")
         ],
         [Markup.button.callback("🚪 Delete My Data", "delete_data")],
-        [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
   });
@@ -587,7 +587,7 @@ ${findingsText}
 Запроси друзів та отримуй бонуси!`, 
       Markup.inlineKeyboard([
         [Markup.button.url("📤 Share", `https://t.me/share/url?url=t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}`)],
-        [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
   });
@@ -616,7 +616,7 @@ ${findingsText}
       Markup.inlineKeyboard([
         [Markup.button.callback("⭐ Buy PRO $10", "buy_pro")],
         [Markup.button.callback("💎 Buy ENTERPRISE $50", "buy_enterprise")],
-        [Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]
+        [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
   });
@@ -673,7 +673,7 @@ ${findingsText}
 Сума: $${state.data.amount} USDT
 
 Очікуйте підтвердження від модератора.`, 
-        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+        Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
@@ -734,7 +734,7 @@ ${findingsText}
 Додано запитів: ${requestsToAdd}
 
 Дякуємо за підтримку!`, 
-          Markup.inlineKeyboard([[Markup.button.callback("🚀 Dashboard", "dashboard")]])
+          Markup.inlineKeyboard([[Markup.button.callback("🚀 Панель", "dashboard")]])
         );
       } catch (e) {
         console.log(`Failed to notify user:`, e);
@@ -798,13 +798,13 @@ ${findingsText}
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "coupon", step: "input" });
     await ctx.reply("🎁 Введи код купону:", 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
     );
   });
 
-  // --- Achievements ---
+  // --- Досягнення ---
   bot.action("achievements", async (ctx) => {
-    await ctx.editMessageText(`🎮 Achievements
+    await ctx.editMessageText(`🎮 Досягнення
 
 🏆 Risk Hunter - 10 перевірок (0/10)
 🛡️ Scam Slayer - 50 перевірок (0/50)
@@ -812,20 +812,20 @@ ${findingsText}
 📣 Referral King - 5 рефералів (0/5)
 
 Розблокуй бейджі та отримуй бонусні запити!`, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
     );
   });
 
   // --- History ---
   bot.action("history", async (ctx) => {
-    await ctx.editMessageText(`📊 History/Timeline
+    await ctx.editMessageText(`📊 Історія/Хронологія
 
 Історія змін твоїх об'єктів:
 
 (Поки що порожньо)
 
 Додай об'єкти до моніторингу для відстеження змін.`, 
-      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Dashboard", "back_to_dashboard")]])
+      Markup.inlineKeyboard([[Markup.button.callback("⬅️ Панель", "back_to_dashboard")]])
     );
   });
 
@@ -851,7 +851,7 @@ ${findingsText}
         ],
         [
           Markup.button.callback("📢 Broadcast", "admin_broadcast"),
-          Markup.button.callback("🎁 Coupons", "admin_coupons")
+          Markup.button.callback("🎁 Купони", "admin_coupons")
         ],
         [Markup.button.callback("⬅️ Exit Admin", "back_to_dashboard")]
       ])

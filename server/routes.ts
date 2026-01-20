@@ -271,7 +271,7 @@ export async function registerRoutes(
       });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=DARKSHARE_${report.objectType}_${id}.pdf`);
+      res.setHeader('Content-Disposition', `inline; filename=DARKSHARE_${report.objectType}_${id}.pdf`);
       res.send(pdfBuffer);
     } catch (err) {
       res.status(500).json({ error: "Failed to generate PDF" });
