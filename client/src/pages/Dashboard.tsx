@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Shield, 
   Globe, 
@@ -55,7 +55,9 @@ export default function Dashboard() {
   const [selectedType, setSelectedType] = useState("ip");
   const [inputValue, setInputValue] = useState("");
   const [result, setResult] = useState<CheckResult | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const checkMutation = useMutation({
     mutationFn: async ({ type, value }: { type: string; value: string }) => {
@@ -64,6 +66,8 @@ export default function Dashboard() {
     },
     onSuccess: (data) => {
       setResult(data);
+      // Invalidate reports cache so history page shows the new report
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
     },
     onError: (error: any) => {
       toast({
@@ -75,7 +79,9 @@ export default function Dashboard() {
   });
 
   const handleCheck = () => {
-    if (!inputValue.trim()) {
+    // Use inputRef value as fallback for Playwright compatibility
+    const value = inputValue.trim() || inputRef.current?.value?.trim() || "";
+    if (!value) {
       toast({
         title: "Помилка",
         description: "Введіть значення для перевірки",
@@ -83,7 +89,7 @@ export default function Dashboard() {
       });
       return;
     }
-    checkMutation.mutate({ type: selectedType, value: inputValue.trim() });
+    checkMutation.mutate({ type: selectedType, value });
   };
 
   const getRiskColor = (level: string) => {
@@ -182,6 +188,7 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground">{selectedCheck?.description}</p>
                   <div className="flex gap-2">
                     <Input
+                      ref={inputRef}
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       placeholder={selectedCheck?.placeholder}
