@@ -99,7 +99,7 @@ export default function Home() {
 
             <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <a 
-                href="https://t.me/darkshare_bot" 
+                href="https://t.me/DARKSHAREN1_BOT" 
                 target="_blank" 
                 rel="noreferrer"
                 className="group relative px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl text-lg flex items-center gap-2 overflow-hidden transition-transform hover:scale-105 active:scale-95"
