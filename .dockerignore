@@ -1,9 +1,7 @@
 node_modules
 dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+.git
+.gitignore
 .env
 .env.local
 .env.production
@@ -12,3 +10,8 @@ vite.config.ts.*
 .upm
 .local
 attached_assets
+*.md
+*.tar.gz
+Dockerfile
+.dockerignore
+railway.json

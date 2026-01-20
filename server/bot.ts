@@ -216,7 +216,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_ip", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "ip", step: "input" });
-    await ctx.reply("🌐 IP/GEO Check\n\nВведи IP-адресу (напр. 8.8.8.8):", 
+    await ctx.reply("🌐 IP/GEO Перевірка\n\nВведи IP-адресу (напр. 8.8.8.8):", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -225,7 +225,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_wallet", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "wallet", step: "input" });
-    await ctx.reply("💰 Blockchain/Wallet Check\n\nВведи адресу гаманця (0x...):", 
+    await ctx.reply("💰 Гаманець/Блокчейн Перевірка\n\nВведи адресу гаманця (0x...):", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -234,7 +234,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_phone", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "phone", step: "input" });
-    await ctx.reply("📱 Phone/VOIP Check\n\nВведи номер телефону:", 
+    await ctx.reply("📱 Телефон/VOIP Перевірка\n\nВведи номер телефону:", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -243,7 +243,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_email", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "email", step: "input" });
-    await ctx.reply("📧 Email/Leaks Check\n\nВведи email адресу:", 
+    await ctx.reply("📧 Email/Витоки Перевірка\n\nВведи email адресу:", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -252,7 +252,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_business", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "domain", step: "input" });
-    await ctx.reply("🏢 Business/Domain Check\n\nВведи домен (напр. example.com):", 
+    await ctx.reply("🏢 Домен/Бізнес Перевірка\n\nВведи домен (напр. example.com):", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -261,7 +261,7 @@ Join 100k+ юзерів!`;
   bot.action("mod_url", async (ctx) => {
     const tgId = ctx.from!.id.toString();
     userStates.set(tgId, { module: "url", step: "input" });
-    await ctx.reply("🔗 URL/Link Risk Check\n\nВведи URL для перевірки:", 
+    await ctx.reply("🔗 URL/Посилання Перевірка\n\nВведи URL для перевірки:", 
       Markup.inlineKeyboard([[Markup.button.callback("❌ Скасувати", "back_to_dashboard")]])
     );
   });
@@ -576,7 +576,7 @@ ${findingsText}
     const tgId = ctx.from!.id.toString();
     const user = await storage.getUserByTgId(tgId);
 
-    await ctx.editMessageText(`📣 Referral Program
+    await ctx.editMessageText(`📣 Реферальна програма
 
 Твій код: ${user?.refCode}
 Посилання: t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}
@@ -586,7 +586,7 @@ ${findingsText}
 
 Запроси друзів та отримуй бонуси!`, 
       Markup.inlineKeyboard([
-        [Markup.button.url("📤 Share", `https://t.me/share/url?url=t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}`)],
+        [Markup.button.url("📤 Поділитися", `https://t.me/share/url?url=t.me/DARKSHAREN1_BOT?start=ref_${user?.refCode}`)],
         [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
@@ -594,9 +594,9 @@ ${findingsText}
 
   // --- Upgrade ---
   bot.action("upgrade", async (ctx) => {
-    await ctx.editMessageText(`💳 Subscription Plans
+    await ctx.editMessageText(`💳 Тарифні плани
 
-🆓 FREE (Current)
+🆓 БЕЗКОШТОВНО (Поточний)
 • 15 запитів/день
 • Базові модулі
 • 1 об'єкт моніторингу
@@ -605,17 +605,17 @@ ${findingsText}
 • Безлімітні запити
 • Всі модулі (CVE, IoT, Cloud)
 • Безлімітний моніторинг
-• PDF без watermark
-• Priority support
+• PDF без водяного знаку
+• Пріоритетна підтримка
 
 💎 ENTERPRISE - $50/місяць
 • Все з PRO
 • API доступ
 • SIEM інтеграція
-• Dedicated support`, 
+• Персональна підтримка`, 
       Markup.inlineKeyboard([
-        [Markup.button.callback("⭐ Buy PRO $10", "buy_pro")],
-        [Markup.button.callback("💎 Buy ENTERPRISE $50", "buy_enterprise")],
+        [Markup.button.callback("⭐ Купити PRO $10", "buy_pro")],
+        [Markup.button.callback("💎 Купити ENTERPRISE $50", "buy_enterprise")],
         [Markup.button.callback("⬅️ Панель", "back_to_dashboard")]
       ])
     );
@@ -836,24 +836,24 @@ ${findingsText}
     // For now, allow anyone to see admin (in production, check ADMIN_IDS)
     const stats = await storage.getStats();
 
-    await ctx.reply(`🌑 ADMIN PANEL
+    await ctx.reply(`🌑 АДМІН ПАНЕЛЬ
 
-📊 Stats:
-• Total Users: ${stats.totalUsers}
-• Active Watches: ${stats.activeWatches}
+📊 Статистика:
+• Всього користувачів: ${stats.totalUsers}
+• Активних моніторів: ${stats.activeWatches}
 • MRR: $0
 
 Виберіть дію:`, 
       Markup.inlineKeyboard([
         [
-          Markup.button.callback("👥 Users", "admin_users"),
-          Markup.button.callback("📊 Analytics", "admin_analytics")
+          Markup.button.callback("👥 Користувачі", "admin_users"),
+          Markup.button.callback("📊 Аналітика", "admin_analytics")
         ],
         [
-          Markup.button.callback("📢 Broadcast", "admin_broadcast"),
+          Markup.button.callback("📢 Розсилка", "admin_broadcast"),
           Markup.button.callback("🎁 Купони", "admin_coupons")
         ],
-        [Markup.button.callback("⬅️ Exit Admin", "back_to_dashboard")]
+        [Markup.button.callback("⬅️ Вийти", "back_to_dashboard")]
       ])
     );
   });
