@@ -1,27 +1,27 @@
-FROM node:20-alpine
+# Stage 1: Build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install all dependencies (including dev for build)
 RUN npm ci
 
-# Copy source code
 COPY . .
-
-# Build the application
 RUN npm run build
 
-# Prune dev dependencies
-RUN npm prune --production
+# Stage 2: Production
+FROM node:20-alpine AS runtime
 
-# Expose port
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/migrations ./migrations
+
 EXPOSE 5000
 
-# Set environment
 ENV NODE_ENV=production
 
-# Start the application
 CMD ["npm", "start"]
