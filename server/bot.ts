@@ -104,6 +104,10 @@ Daily tip: Check IP на blacklists!
 
 Обери модуль:`;
 
+    const webUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : "https://darkshare.replit.app";
+
     try {
       await ctx.editMessageText(dashboardText, Markup.inlineKeyboard([
         [
@@ -134,6 +138,9 @@ Daily tip: Check IP на blacklists!
         [
           Markup.button.callback("🎁 Coupon", "coupon"),
           Markup.button.callback("🎮 Achievements", "achievements")
+        ],
+        [
+          Markup.button.url("🖥️ Web Dashboard", webUrl)
         ]
       ]));
     } catch {
@@ -156,6 +163,9 @@ Daily tip: Check IP на blacklists!
         [
           Markup.button.callback("💳 Upgrade", "upgrade"),
           Markup.button.callback("📣 Referrals", "referrals")
+        ],
+        [
+          Markup.button.url("🖥️ Web Dashboard", webUrl)
         ]
       ]));
     }
@@ -173,6 +183,10 @@ Daily tip: Check IP на blacklists!
 
 Обери модуль:`;
 
+    const webUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : "https://darkshare.replit.app";
+
     await ctx.reply(dashboardText, Markup.inlineKeyboard([
       [
         Markup.button.callback("🌐 IP/GEO", "mod_ip"),
@@ -188,6 +202,9 @@ Daily tip: Check IP на blacklists!
         Markup.button.callback("👁 Monitoring", "monitoring"),
         Markup.button.callback("📄 Reports", "reports"),
         Markup.button.callback("⚙️ Settings", "settings")
+      ],
+      [
+        Markup.button.url("🖥️ Web Dashboard", webUrl)
       ]
     ]));
   });

@@ -21,7 +21,10 @@ import {
   Eye,
   X,
   LogOut,
-  User
+  User,
+  CreditCard,
+  Zap,
+  Crown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -345,6 +348,74 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-4">
+            <Card className="bg-black/40 border-white/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Профіль
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                    <User className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">@{user?.username}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                        {user?.tier === "PRO" || user?.tier === "ELITE" ? (
+                          <Crown className="w-3 h-3" />
+                        ) : (
+                          <Zap className="w-3 h-3" />
+                        )}
+                        {user?.tier}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Запитів залишилось</span>
+                    <span className="font-mono text-sm">{user?.requestsLeft ?? 0}</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${Math.min(((user?.requestsLeft ?? 0) / 15) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  className="w-full" 
+                  data-testid="button-topup"
+                  onClick={() => {
+                    toast({
+                      title: "Поповнення балансу",
+                      description: (
+                        <div className="space-y-2">
+                          <p>Для поповнення балансу скористайтесь Telegram ботом.</p>
+                          <a 
+                            href="https://t.me/DARKSHAREN1_BOT" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            Відкрити бота
+                          </a>
+                        </div>
+                      ),
+                    });
+                  }}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Поповнити
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card className="bg-black/40 border-white/10">
               <CardHeader>
                 <CardTitle className="text-sm">Швидкі дії</CardTitle>
