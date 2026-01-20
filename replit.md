@@ -6,8 +6,32 @@ DARKSHARE is a Telegram bot application for risk assessment and security analysi
 
 The application consists of:
 - A React-based landing page showcasing features and live statistics
+- A full web dashboard for performing security checks, viewing history, and managing monitors
 - A Telegram bot (built with Telegraf) handling user interactions and analysis workflows
 - A PostgreSQL database for user management, reports, monitoring watches, and payments
+
+## Web Dashboard Features
+
+### Routes
+- `/` - Landing page with "Web Dashboard" and "Telegram Bot" buttons
+- `/dashboard` - Check form with 6 check types (IP, wallet, email, phone, domain, URL)
+- `/history` - Report history with PDF download capability
+- `/monitoring` - Watchlist management (add/view/delete monitors)
+
+### API Endpoints
+- `POST /api/check` - Performs security checks with validation and risk analysis
+- `GET /api/reports` - Lists user reports
+- `GET /api/reports/:id/pdf` - Downloads PDF report
+- `GET /api/watches` - Lists user monitors
+- `POST /api/watches` - Creates a new monitor
+- `DELETE /api/watches/:id` - Deletes a monitor
+
+### Shared Check Service
+The `server/checkService.ts` module provides:
+- Input validation for all check types
+- Realistic risk analysis using deterministic algorithms
+- Risk scoring (0-100) with levels: low, medium, high, critical
+- Detailed findings and metadata generation
 
 ## User Preferences
 
