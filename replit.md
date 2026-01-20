@@ -44,9 +44,31 @@ The application consists of:
 ### Shared Check Service
 The `server/checkService.ts` module provides:
 - Input validation for all check types
-- Realistic risk analysis using deterministic algorithms
+- Real API integrations where possible (free services only)
 - Risk scoring (0-100) with levels: low, medium, high, critical
 - Detailed findings and metadata generation
+
+**Check Types & APIs:**
+- **IP Check**: Uses ip-api.com (free) for real geolocation, ISP, proxy/VPN detection
+- **Wallet Check**: Local pattern analysis, known mixer address detection
+- **Email Check**: Domain validation, disposable email detection, format analysis
+- **Domain Check**: TLD analysis, typosquatting detection, suspicious patterns
+- **Phone Check**: Country code detection, format validation, carrier hints
+- **URL Check**: Protocol analysis, shortener detection, phishing pattern detection
+
+### Payment Verification System
+Manual payment workflow with moderator approval:
+1. User sends screenshot or tx hash via Telegram bot
+2. Moderator (ADMIN_IDS) receives notification with Approve/Reject buttons
+3. On approval: user tier and request quota updated, confirmation sent
+4. On rejection: user notified with rejection reason
+
+**Payment table tracks:**
+- `screenshot_url`: Image file path
+- `tx_hash`: Transaction hash
+- `status`: pending, approved, rejected
+- `tier_requested`: basic, pro, elite
+- `amount`: Payment amount
 
 ## User Preferences
 

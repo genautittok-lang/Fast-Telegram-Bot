@@ -1,6 +1,7 @@
 import { Telegraf, Markup, Context } from "telegraf";
 import { IStorage } from "./storage";
 import { generateDetailedPDF, generateFindings, generateMetadata } from "./pdfGenerator";
+import { performCheck, CheckResult } from "./checkService";
 
 interface BotContext extends Context {}
 
@@ -349,98 +350,65 @@ TX Hash: ${txHash}`,
     }
 
     // Process based on module
-    let result = "";
-    let riskLevel = "🟢";
     const inputValue = text.trim();
-
+    
+    // Validate input based on module type
     switch (state.module) {
       case "ip":
         if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(inputValue)) {
           return ctx.reply("❌ Невірний формат IP.\nПриклад: 8.8.8.8\n\nСпробуй ще раз:");
         }
-        riskLevel = Math.random() > 0.5 ? "🟢" : "🟡";
-        result = `🌐 IP/GEO Result: ${inputValue}
-${riskLevel} ${riskLevel === "🟢" ? "Low" : "Medium"} risk
-
-📍 GEO: Ukraine/Kyiv
-🏢 ASN: 15169 (Google LLC)
-📡 Provider: ISP Name
-🚫 Blacklist: Score 25/100
-
-Sources: AbuseIPDB, IPInfo`;
         break;
-
       case "wallet":
         if (!inputValue.startsWith("0x") || inputValue.length < 20) {
           return ctx.reply("❌ Невірний формат гаманця.\nПриклад: 0x1234...abcd\n\nСпробуй ще раз:");
         }
-        riskLevel = Math.random() > 0.7 ? "🔴" : Math.random() > 0.4 ? "🟡" : "🟢";
-        result = `💰 Blockchain/Wallet: ${inputValue.substring(0,10)}...
-${riskLevel} ${riskLevel === "🟢" ? "Low" : riskLevel === "🟡" ? "Medium" : "High"} risk
-
-📊 Tx history: 154 transactions
-💵 Balance: 1.5 ETH (~$4500)
-🪙 Tokens: 1000 USDT, 50 DAI
-🚫 Flags: ${riskLevel === "🔴" ? "Mixer interaction detected!" : "Clean"}
-
-Sources: Etherscan, Chainalysis`;
         break;
-
-      case "phone":
-        riskLevel = Math.random() > 0.6 ? "🔴" : "🟡";
-        result = `📱 Phone Check: ${inputValue}
-${riskLevel} ${riskLevel === "🔴" ? "High" : "Medium"} risk
-
-📞 Type: ${riskLevel === "🔴" ? "VOIP/Virtual" : "Mobile"}
-🌍 Country: Ukraine
-⚠️ Reports: ${riskLevel === "🔴" ? "High abuse score" : "Low abuse score"}
-
-Sources: NumVerify, Twilio`;
-        break;
-
       case "email":
         if (!inputValue.includes("@")) {
           return ctx.reply("❌ Невірний email.\nПриклад: user@example.com\n\nСпробуй ще раз:");
         }
-        riskLevel = Math.random() > 0.5 ? "🔴" : "🟢";
-        result = `📧 Email Check: ${inputValue}
-${riskLevel} ${riskLevel === "🔴" ? "High" : "Low"} risk
-
-📬 Valid: Yes
-🔓 Breaches: ${riskLevel === "🔴" ? "3 found (LinkedIn, Adobe)" : "None found"}
-🚫 Disposable: No
-
-Sources: HaveIBeenPwned`;
         break;
-
-      case "domain":
-        riskLevel = Math.random() > 0.6 ? "🟡" : "🟢";
-        result = `🏢 Domain Check: ${inputValue}
-${riskLevel} ${riskLevel === "🟡" ? "Medium" : "Low"} risk
-
-📅 Age: 5 years
-🔒 SSL: Valid (Let's Encrypt)
-🏴 Registration: ${riskLevel === "🟡" ? "Offshore" : "Standard"}
-🚫 Sanctions: None (OFAC/EU)
-
-Sources: WHOIS, SSL Labs`;
-        break;
-
-      case "url":
-        riskLevel = Math.random() > 0.7 ? "🔴" : "🟢";
-        result = `🔗 URL Risk: ${inputValue}
-${riskLevel} ${riskLevel === "🔴" ? "High" : "Low"} risk
-
-🦠 Malware: ${riskLevel === "🔴" ? "Detected!" : "None"}
-🎣 Phishing: ${riskLevel === "🔴" ? "Suspected" : "Clean"}
-🔀 Redirects: ${riskLevel === "🔴" ? "2 suspicious" : "0"}
-
-Sources: VirusTotal, Google Safe`;
-        break;
-
-      default:
-        return ctx.reply("Використай /menu для вибору модуля.");
     }
+    
+    // Perform the actual check using checkService
+    let checkResult: CheckResult;
+    try {
+      await ctx.reply("🔄 Аналізую дані...");
+      checkResult = await performCheck(state.module, inputValue);
+    } catch (error: any) {
+      console.error("Check error:", error);
+      return ctx.reply(`❌ Помилка аналізу: ${error.message}\n\nСпробуй ще раз.`);
+    }
+    
+    // Format risk level emoji
+    const getRiskEmoji = (level: string) => {
+      switch (level) {
+        case "low": return "🟢";
+        case "medium": return "🟡";
+        case "high": return "🔴";
+        case "critical": return "⚫";
+        default: return "🟡";
+      }
+    };
+    
+    const riskEmoji = getRiskEmoji(checkResult.riskLevel);
+    
+    // Format findings
+    const findingsText = checkResult.findings.slice(0, 5).map(f => `• ${f}`).join("\n");
+    
+    // Build result message
+    const moduleEmojis: Record<string, string> = {
+      ip: "🌐", wallet: "💰", phone: "📱", email: "📧", domain: "🏢", url: "🔗"
+    };
+    
+    const result = `${moduleEmojis[state.module] || "🔍"} ${checkResult.type.toUpperCase()} Аналіз: ${checkResult.target.substring(0, 30)}${checkResult.target.length > 30 ? "..." : ""}
+${riskEmoji} Ризик: ${checkResult.riskLevel.toUpperCase()} (${checkResult.riskScore}/100)
+
+📋 Знахідки:
+${findingsText}
+
+📊 Джерела: ${checkResult.sources.join(", ")}`;
 
     // Clear state
     userStates.delete(tgId);
