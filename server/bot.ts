@@ -69,18 +69,10 @@ export async function setupBot(storage: IStorage) {
     });
 
     if (refMatch) {
-      welcomeText += lang === "uk" 
-        ? "\n\n🎁 Вітаю від друга! +1 безкоштовний запит."
-        : lang === "ru" 
-        ? "\n\n🎁 Приветствие от друга! +1 бесплатный запрос."
-        : "\n\n🎁 Greeting from a friend! +1 free request.";
+      welcomeText += "\n\n" + t(lang, "common.referralBonus");
     }
 
-    welcomeText += lang === "uk" 
-      ? "\n\nОбери мову / Choose language:"
-      : lang === "ru"
-      ? "\n\nВыбери язык / Choose language:"
-      : "\n\nSelect language:";
+    welcomeText += "\n\n" + t(lang, "common.selectLanguage");
 
     await ctx.reply(welcomeText, Markup.inlineKeyboard([
       [
@@ -100,11 +92,7 @@ export async function setupBot(storage: IStorage) {
     }
     await ctx.answerCbQuery(t(langCode, "settings.languageChanged"));
     
-    const startText = langCode === "uk" 
-      ? "✅ Мову встановлено: Українська\n\nТепер перейди до панелі!"
-      : langCode === "ru"
-      ? "✅ Язык установлен: Русский\n\nТеперь перейди в панель!"
-      : "✅ Language set: English\n\nNow go to dashboard!";
+    const startText = t(langCode, "common.languageSet");
     
     await ctx.editMessageText(startText, 
       Markup.inlineKeyboard([[Markup.button.callback("🚀 " + t(langCode, "buttons.back").replace("⬅️ ", ""), "dashboard")]])
@@ -117,23 +105,15 @@ export async function setupBot(storage: IStorage) {
     userStates.delete(tgId);
 
     const requestsWarning = user && user.requestsLeft! <= 3 
-      ? (lang === "uk" ? "\n⚠️ Мало запитів!" : lang === "ru" ? "\n⚠️ Мало запросов!" : "\n⚠️ Low requests!")
+      ? "\n" + t(lang, "common.lowRequests")
       : '';
 
-    const tipText = lang === "uk" 
-      ? "💡 Порада дня: Перевіряй IP на чорних списках!"
-      : lang === "ru"
-      ? "💡 Совет дня: Проверяй IP на чёрных списках!"
-      : "💡 Tip of the day: Check IPs against blacklists!";
-
-    const tierName = lang === "uk" ? "БЕЗКОШТОВНО" : lang === "ru" ? "БЕСПЛАТНО" : "FREE";
-    
     const dashboardText = `${t(lang, "dashboard.title")}
 
-${t(lang, "dashboard.stats", { requestsLeft: user?.requestsLeft?.toString() || "15", requestsLimit: "15" })} (${tierName})
-🔥 ${lang === "uk" ? "Серія" : lang === "ru" ? "Серия" : "Streak"}: ${user?.streakDays} ${lang === "uk" ? "днів" : lang === "ru" ? "дней" : "days"}${requestsWarning}
+${t(lang, "dashboard.stats", { requestsLeft: user?.requestsLeft?.toString() || "15", requestsLimit: "15" })} (${t(lang, "common.tierFree")})
+🔥 ${t(lang, "common.streak")}: ${user?.streakDays} ${t(lang, "common.days")}${requestsWarning}
 
-${tipText}
+${t(lang, "common.tipOfDay")}
 
 ${t(lang, "dashboard.selectModule")}`;
 
@@ -159,7 +139,7 @@ ${t(lang, "dashboard.selectModule")}`;
       ],
       [
         Markup.button.callback(t(lang, "buttons.monitoring"), "monitoring"),
-        Markup.button.callback("📄 " + (lang === "uk" ? "Звіти" : lang === "ru" ? "Отчёты" : "Reports"), "reports"),
+        Markup.button.callback("📄 " + t(lang, "common.reports"), "reports"),
         Markup.button.callback(t(lang, "buttons.history"), "history")
       ],
       [
@@ -172,7 +152,7 @@ ${t(lang, "dashboard.selectModule")}`;
         Markup.button.callback(t(lang, "buttons.achievements"), "achievements")
       ],
       [
-        Markup.button.url("🖥️ " + (lang === "uk" ? "Веб-панель" : lang === "ru" ? "Веб-панель" : "Web Panel"), webUrl)
+        Markup.button.url("🖥️ " + t(lang, "common.webPanel"), webUrl)
       ]
     ]);
 
@@ -224,11 +204,7 @@ ${t(lang, "dashboard.selectModule")}`;
     const lang = await getLang(tgId);
     await ctx.answerCbQuery(t(lang, "premium.locked"));
     
-    const text = lang === "uk" 
-      ? "🔒 Ця функція доступна тільки для PRO.\n\nОтримай PRO для доступу до:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan"
-      : lang === "ru"
-      ? "🔒 Эта функция доступна только для PRO.\n\nПолучи PRO для доступа к:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan"
-      : "🔒 This feature is PRO only.\n\nGet PRO for access to:\n• CVE/Vulns Scan\n• IoT/Device Fingerprint\n• Cloud Resources Scan";
+    const text = t(lang, "common.proOnly");
     
     await ctx.reply(text, 
       Markup.inlineKeyboard([
@@ -260,13 +236,13 @@ ${t(lang, "dashboard.selectModule")}`;
 
       userStates.delete(tgId);
 
-      await ctx.reply(t(lang, "payment.created", { id: payment.id.toString() }) + `\n\n${lang === "uk" ? "Тариф" : lang === "ru" ? "Тариф" : "Tier"}: ${state.data.tier}\n${lang === "uk" ? "Сума" : lang === "ru" ? "Сумма" : "Amount"}: $${state.data.amount} USDT\nTX Hash: ${txHash}\n\n${t(lang, "payment.pending")}`, 
+      await ctx.reply(t(lang, "payment.created", { id: payment.id.toString() }) + `\n\n${t(lang, "common.tier")}: ${state.data.tier}\n${t(lang, "common.amount")}: $${state.data.amount} USDT\n${t("uk", "admin.txHash")}: ${txHash}\n\n${t(lang, "payment.pending")}`, 
         Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
         try {
-          await ctx.telegram.sendMessage(adminId, t("uk", "admin.newPayment", { id: payment.id.toString() }) + `\n\n${t("uk", "admin.user", { username: user.username || "N/A", tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\nTX Hash: ${txHash}`, 
+          await ctx.telegram.sendMessage(adminId, t("uk", "admin.newPayment", { id: payment.id.toString() }) + `\n\n${t("uk", "admin.user", { username: user.username || t("uk", "common.na"), tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\n${t("uk", "admin.txHash")}: ${txHash}`, 
             {
               reply_markup: Markup.inlineKeyboard([
                 [
@@ -293,12 +269,7 @@ ${t(lang, "dashboard.selectModule")}`;
     }
 
     if (!state || !state.module) {
-      const helpText = lang === "uk" 
-        ? "Використай /menu для вибору модуля."
-        : lang === "ru"
-        ? "Используй /menu для выбора модуля."
-        : "Use /menu to select a module.";
-      return ctx.reply(helpText);
+      return ctx.reply(t(lang, "common.useMenu"));
     }
 
     const inputValue = text.trim();
@@ -323,7 +294,7 @@ ${t(lang, "dashboard.selectModule")}`;
     
     let checkResult: CheckResult;
     try {
-      const analyzingText = lang === "uk" ? "🔄 Аналізую дані..." : lang === "ru" ? "🔄 Анализирую данные..." : "🔄 Analyzing data...";
+      const analyzingText = t(lang, "common.analyzing");
       await ctx.reply(analyzingText);
       checkResult = await performCheck(state.module, inputValue);
     } catch (error: any) {
@@ -349,9 +320,9 @@ ${t(lang, "dashboard.selectModule")}`;
     const riskEmoji = getRiskEmoji(checkResult.riskLevel);
     const findingsText = checkResult.findings.slice(0, 5).map(f => `• ${f}`).join("\n");
     
-    const riskWord = lang === "uk" ? "Ризик" : lang === "ru" ? "Риск" : "Risk";
-    const findingsWord = lang === "uk" ? "Знахідки" : lang === "ru" ? "Находки" : "Findings";
-    const sourcesWord = lang === "uk" ? "Джерела" : lang === "ru" ? "Источники" : "Sources";
+    const riskWord = t(lang, "result.risk");
+    const findingsWord = t(lang, "result.findings");
+    const sourcesWord = t(lang, "result.sources");
 
     const result = `${moduleEmojis[state.module] || "🔍"} ${checkResult.type.toUpperCase()} ${t(lang, "result.analysis")}: ${checkResult.target.substring(0, 30)}${checkResult.target.length > 30 ? "..." : ""}
 ${riskEmoji} ${riskWord}: ${checkResult.riskLevel.toUpperCase()} (${checkResult.riskScore}/100)
@@ -395,10 +366,10 @@ ${findingsText}
     const user = await storage.getUserByTgId(tgId);
     const lang = getUserLang(user?.lang);
     
-    if (!user) return ctx.answerCbQuery("Error");
+    if (!user) return ctx.answerCbQuery(t(lang, "common.error"));
 
     try {
-      const generatingText = lang === "uk" ? "📄 Генерую PDF..." : lang === "ru" ? "📄 Генерирую PDF..." : "📄 Generating PDF...";
+      const generatingText = t(lang, "common.generatingPdf");
       await ctx.answerCbQuery(generatingText);
       
       const checkResult = await performCheck(module, target);
@@ -425,7 +396,7 @@ ${findingsText}
       });
     } catch (err) {
       console.error("PDF generation error:", err);
-      const errorText = lang === "uk" ? "❌ Помилка генерації PDF" : lang === "ru" ? "❌ Ошибка генерации PDF" : "❌ PDF generation error";
+      const errorText = t(lang, "common.pdfError");
       await ctx.reply(errorText);
     }
   });
@@ -438,7 +409,7 @@ ${findingsText}
     const user = await storage.getUserByTgId(tgId);
     const lang = getUserLang(user?.lang);
     
-    if (!user) return ctx.answerCbQuery("Error");
+    if (!user) return ctx.answerCbQuery(t(lang, "common.error"));
 
     const existingWatches = await storage.getWatches(user.id);
     const watchLimit = user.tier === "FREE" ? 1 : 999;
@@ -480,11 +451,7 @@ ${findingsText}
     let text = `${title}\n\n`;
     
     if (watches.length === 0) {
-      text += lang === "uk" 
-        ? "(Порожньо)\n\nДодай об'єкт після перевірки."
-        : lang === "ru"
-        ? "(Пусто)\n\nДобавь объект после проверки."
-        : "(Empty)\n\nAdd an object after a check.";
+      text += t(lang, "common.empty") + "\n\n" + t(lang, "common.addAfterCheck");
     } else {
       watches.forEach((w, i) => {
         const statusEmoji = w.status === "low" ? "🟢" : w.status === "medium" ? "🟡" : "🔴";
@@ -506,18 +473,14 @@ ${findingsText}
 
     const reports = await storage.getReports(user.id);
     
-    const title = lang === "uk" ? "📄 Звіти" : lang === "ru" ? "📄 Отчёты" : "📄 Reports";
+    const title = "📄 " + t(lang, "common.reports");
     let text = `${title}\n\n`;
     
     if (reports.length === 0) {
-      text += lang === "uk" 
-        ? "(Порожньо)\n\nПроведи перевірку для створення звіту."
-        : lang === "ru"
-        ? "(Пусто)\n\nПроведи проверку для создания отчёта."
-        : "(Empty)\n\nRun a check to create a report.";
+      text += t(lang, "common.empty") + "\n\n" + t(lang, "common.runCheck");
     } else {
       reports.slice(0, 10).forEach((r, i) => {
-        const date = r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "N/A";
+        const date = r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : t(lang, "common.na");
         text += `${i + 1}. ${r.objectType.toUpperCase()} - ${date}\n`;
       });
     }
@@ -562,7 +525,7 @@ ${findingsText}
     const user = await storage.getUserByTgId(tgId);
     const lang = getUserLang(user?.lang);
 
-    const text = `${t(lang, "referrals.title")}\n\n${t(lang, "referrals.yourCode", { code: user?.refCode || "N/A" })}\n${t(lang, "referrals.link", { code: user?.refCode || "N/A" })}\n\n${t(lang, "referrals.count", { count: "0" })}\n${t(lang, "referrals.earnings", { amount: "0" })}\n\n${t(lang, "referrals.invite")}`;
+    const text = `${t(lang, "referrals.title")}\n\n${t(lang, "referrals.yourCode", { code: user?.refCode || t(lang, "common.na") })}\n${t(lang, "referrals.link", { code: user?.refCode || t(lang, "common.na") })}\n\n${t(lang, "referrals.count", { count: "0" })}\n${t(lang, "referrals.earnings", { amount: "0" })}\n\n${t(lang, "referrals.invite")}`;
 
     await ctx.editMessageText(text, 
       Markup.inlineKeyboard([
@@ -624,14 +587,14 @@ ${findingsText}
 
       userStates.delete(tgId);
 
-      await ctx.reply(`${t(lang, "payment.created", { id: payment.id.toString() })}\n\n${lang === "uk" ? "Тариф" : lang === "ru" ? "Тариф" : "Tier"}: ${state.data.tier}\n${lang === "uk" ? "Сума" : lang === "ru" ? "Сумма" : "Amount"}: $${state.data.amount} USDT\n\n${t(lang, "payment.pending")}`, 
+      await ctx.reply(`${t(lang, "payment.created", { id: payment.id.toString() })}\n\n${t(lang, "common.tier")}: ${state.data.tier}\n${t(lang, "common.amount")}: $${state.data.amount} USDT\n\n${t(lang, "payment.pending")}`, 
         Markup.inlineKeyboard([[Markup.button.callback(t(lang, "buttons.back"), "back_to_dashboard")]])
       );
 
       for (const adminId of ADMIN_IDS) {
         try {
           await ctx.telegram.sendPhoto(adminId, fileId, {
-            caption: `${t("uk", "admin.newPayment", { id: payment.id.toString() })}\n\n${t("uk", "admin.user", { username: user.username || "N/A", tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\n${t("uk", "admin.type", { type: lang === "uk" ? "Скріншот" : lang === "ru" ? "Скриншот" : "Screenshot" })}`,
+            caption: `${t("uk", "admin.newPayment", { id: payment.id.toString() })}\n\n${t("uk", "admin.user", { username: user.username || t("uk", "common.na"), tgId: user.tgId })}\n${t("uk", "admin.tier", { tier: state.data.tier })}\n${t("uk", "admin.paymentAmount", { amount: state.data.amount })}\n${t("uk", "admin.type", { type: t(lang, "common.screenshot") })}`,
             reply_markup: Markup.inlineKeyboard([
               [
                 Markup.button.callback(t("uk", "admin.approve"), `approve_pay_${payment.id}`),
@@ -678,8 +641,8 @@ ${findingsText}
       }
     }
 
-    await ctx.editMessageCaption(`${t("uk", "admin.approved", { admin: ctx.from!.username || "Admin" })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || "N/A", tgId: user?.tgId || "N/A" })}`);
-    await ctx.answerCbQuery("Approved!");
+    await ctx.editMessageCaption(`${t("uk", "admin.approved", { admin: ctx.from!.username || t("uk", "common.na") })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || t("uk", "common.na"), tgId: user?.tgId || t("uk", "common.na") })}`);
+    await ctx.answerCbQuery(t("uk", "admin.approvedShort"));
   });
 
   bot.action(/^reject_pay_(\d+)$/, async (ctx) => {
@@ -708,8 +671,8 @@ ${findingsText}
       }
     }
 
-    await ctx.editMessageCaption(`${t("uk", "admin.rejected", { admin: ctx.from!.username || "Admin" })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || "N/A", tgId: user?.tgId || "N/A" })}`);
-    await ctx.answerCbQuery("Rejected");
+    await ctx.editMessageCaption(`${t("uk", "admin.rejected", { admin: ctx.from!.username || t("uk", "common.na") })}\n\n${t("uk", "admin.newPayment", { id: paymentId.toString() })}\n${t("uk", "admin.user", { username: user?.username || t("uk", "common.na"), tgId: user?.tgId || t("uk", "common.na") })}`);
+    await ctx.answerCbQuery(t("uk", "admin.rejectedShort"));
   });
 
   bot.action("coupon", async (ctx) => {
