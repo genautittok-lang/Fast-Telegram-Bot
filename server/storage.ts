@@ -9,13 +9,15 @@ export interface IStorage {
   updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
   
   // Reports
-  createReport(report: any): Promise<Report>; // using any for insert schema helper
+  createReport(report: any): Promise<Report>;
   getReports(userId: number): Promise<Report[]>;
+  getReportById(id: number): Promise<Report | undefined>;
   
   // Watches
   createWatch(watch: any): Promise<Watch>;
   getWatches(userId: number): Promise<Watch[]>;
   updateWatch(id: number, updates: Partial<Watch>): Promise<Watch>;
+  deleteWatch(id: number): Promise<void>;
   
   // Stats
   getStats(): Promise<{ totalUsers: number, activeWatches: number }>;
@@ -51,6 +53,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(reports).where(eq(reports.userId, userId));
   }
 
+  async getReportById(id: number): Promise<Report | undefined> {
+    const [report] = await db.select().from(reports).where(eq(reports.id, id));
+    return report;
+  }
+
   async createWatch(insertWatch: any): Promise<Watch> {
     const [watch] = await db.insert(watches).values(insertWatch).returning();
     return watch;
@@ -63,6 +70,10 @@ export class DatabaseStorage implements IStorage {
   async updateWatch(id: number, updates: Partial<Watch>): Promise<Watch> {
     const [watch] = await db.update(watches).set(updates).where(eq(watches.id, id)).returning();
     return watch;
+  }
+
+  async deleteWatch(id: number): Promise<void> {
+    await db.delete(watches).where(eq(watches.id, id));
   }
 
   async getStats(): Promise<{ totalUsers: number, activeWatches: number }> {

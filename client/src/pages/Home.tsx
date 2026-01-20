@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "wouter";
 import { 
   ShieldCheck, 
   Globe, 
@@ -134,16 +135,26 @@ export default function Home() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4 pt-4">
+                  <Link href="/dashboard">
+                    <div 
+                      className="group relative px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl text-lg flex items-center gap-2 overflow-hidden transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                      data-testid="button-web-dashboard"
+                    >
+                      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                      <ShieldCheck className="w-5 h-5" />
+                      <span>Web Dashboard</span>
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </Link>
                   <a 
                     href="https://t.me/DARKSHAREN1_BOT" 
                     target="_blank" 
                     rel="noreferrer"
-                    className="group relative px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl text-lg flex items-center gap-2 overflow-hidden transition-transform hover:scale-105 active:scale-95"
+                    className="group relative px-8 py-4 bg-white/10 border border-white/20 text-white font-bold rounded-xl text-lg flex items-center gap-2 overflow-hidden transition-transform hover:scale-105 active:scale-95"
                     data-testid="button-launch-bot"
                   >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <Zap className="w-5 h-5 fill-current" />
-                    <span>Launch Bot</span>
+                    <Zap className="w-5 h-5" />
+                    <span>Telegram Bot</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </a>
                 </div>
