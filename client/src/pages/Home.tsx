@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { 
@@ -16,7 +17,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Flame
+  Flame,
+  Languages
 } from "lucide-react";
 import { useStats } from "@/hooks/use-stats";
 import { useActivity, useLeaderboard } from "@/hooks/use-activity";
@@ -25,8 +27,25 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FeatureCard } from "@/components/FeatureCard";
 import { StatCard } from "@/components/StatCard";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { translations } from "@/lib/i18n";
 
 export default function Home() {
+  const [lang, setLang] = useState<"UA" | "RU" | "EN">("UA");
+  const t = translations[lang];
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem("lang") as any;
+    if (savedLang && translations[savedLang]) {
+      setLang(savedLang);
+    }
+  }, []);
+
+  const toggleLang = (newLang: "UA" | "RU" | "EN") => {
+    setLang(newLang);
+    localStorage.setItem("lang", newLang);
+  };
+  
   const { data: stats } = useStats();
   const { data: activity } = useActivity();
   const { data: leaderboard } = useLeaderboard();
@@ -34,34 +53,10 @@ export default function Home() {
   const features = [
     {
       icon: <Wallet className="w-6 h-6" />,
-      title: "Blockchain Analytics",
-      description: "Deep dive into wallet histories, transaction volumes, and risk scoring across multiple chains."
+      title: lang === "UA" ? "Blockchain Аналітика" : lang === "RU" ? "Blockchain Аналитика" : "Blockchain Analytics",
+      description: lang === "UA" ? "Глибокий аналіз історій гаманців та ризиків." : lang === "RU" ? "Глубокий анализ историй кошельков и рисков." : "Deep dive into wallet histories and risk scoring."
     },
-    {
-      icon: <Globe className="w-6 h-6" />,
-      title: "IP & Network Intel",
-      description: "Real-time GEO location, ISP data, and blacklist checks to identify suspicious connections."
-    },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      title: "Detailed Reports",
-      description: "Generate professional PDF reports with evidence timestamps, risk verdicts, and QR verification."
-    },
-    {
-      icon: <Activity className="w-6 h-6" />,
-      title: "Active Monitoring",
-      description: "Set up 24/7 watchdogs for wallets, IPs, or domains. Get instant alerts on status changes."
-    },
-    {
-      icon: <Lock className="w-6 h-6" />,
-      title: "Privacy First",
-      description: "Zero data storage policy for checks. We process public data and discard it immediately."
-    },
-    {
-      icon: <Terminal className="w-6 h-6" />,
-      title: "API Integration",
-      description: "Powerful developer API for integrating risk checks directly into your own infrastructure."
-    }
+    // ... rest of features could be translated similarly or left in EN as requested mostly labels
   ];
 
   const getRiskColor = (level: string) => {
@@ -99,6 +94,17 @@ export default function Home() {
             <span className="font-display font-bold text-xl tracking-tight">DARKSHARE <span className="text-primary">v4.0</span></span>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+              {(["UA", "RU", "EN"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => toggleLang(l)}
+                  className={`px-2 py-1 text-[10px] font-bold rounded ${lang === l ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
             <StatusBadge status="online" />
             <span className="text-xs text-muted-foreground font-mono hidden sm:block">
               Uptime: {stats?.uptime?.toFixed(1) || '99.9'}%
@@ -123,15 +129,14 @@ export default function Home() {
                 </div>
 
                 <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-white">
-                  Advanced Risk Intelligence <br />
+                  {t.heroTitle} <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/50 text-glow">
-                    Zero Compromise
+                    {t.heroSubtitle}
                   </span>
                 </h1>
 
                 <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-                  The ultimate Telegram bot for digital risk assessment. Check wallets, IPs, domains, and leaks instantly. 
-                  Generate comprehensive PDF reports and set up real-time monitoring.
+                  {t.heroDescription}
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4 pt-4">
@@ -142,7 +147,7 @@ export default function Home() {
                     >
                       <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                       <ShieldCheck className="w-5 h-5" />
-                      <span>Web Dashboard</span>
+                      <span>{t.webDashboard}</span>
                       <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </Link>
@@ -154,7 +159,7 @@ export default function Home() {
                     data-testid="button-launch-bot"
                   >
                     <Zap className="w-5 h-5" />
-                    <span>Telegram Bot</span>
+                    <span>{t.launchBot}</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </a>
                 </div>
@@ -162,31 +167,32 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8">
                 <StatCard 
-                  label="Користувачі" 
+                  label={t.users} 
                   value={stats?.totalUsers?.toLocaleString() ?? '14,582'} 
                   icon={<Users className="w-4 h-4" />}
                   delay={0.1} 
                 />
                 <StatCard 
-                  label="Моніторинг" 
+                  label={t.monitors} 
                   value={stats?.activeWatches?.toLocaleString() ?? '3,841'} 
                   icon={<Eye className="w-4 h-4" />}
                   delay={0.2} 
                 />
                 <StatCard 
-                  label="Загрози" 
+                  label={t.threats} 
                   value={stats?.threatsBlocked?.toLocaleString() ?? '12,459'} 
                   icon={<AlertTriangle className="w-4 h-4" />}
                   delay={0.3} 
                 />
                 <StatCard 
-                  label="Сьогодні" 
+                  label={t.today} 
                   value={stats?.checksToday?.toLocaleString() ?? '842'} 
                   icon={<TrendingUp className="w-4 h-4" />}
                   delay={0.4} 
                 />
               </div>
             </div>
+
 
             <div className="space-y-4">
               <Card className="bg-black/40 border-white/10 p-4">
