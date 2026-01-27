@@ -32,10 +32,10 @@ import { translations } from "@/lib/i18n";
 
 export default function Home() {
   const [lang, setLang] = useState<"UA" | "RU" | "EN">("UA");
-  const t = translations[lang];
+  const t = translations[lang as keyof typeof translations];
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("lang") as any;
+    const savedLang = localStorage.getItem("lang") as keyof typeof translations;
     if (savedLang && translations[savedLang]) {
       setLang(savedLang);
     }

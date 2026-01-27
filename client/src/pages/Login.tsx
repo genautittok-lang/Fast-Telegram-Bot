@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Lock, Bot, ArrowLeft, Sparkles, CheckCircle, Zap, Globe } from "lucide-react";
+import { Shield, Lock, Bot, ArrowLeft, Sparkles, CheckCircle, Zap, Globe, Languages } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { translations } from "@/lib/i18n";
 
 declare global {
   interface Window {
@@ -21,7 +22,21 @@ export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [lang, setLang] = useState<keyof typeof translations>("UA");
+  const t = translations[lang];
 
+  useEffect(() => {
+    const savedLang = localStorage.getItem("lang") as keyof typeof translations;
+    if (savedLang && translations[savedLang]) {
+      setLang(savedLang);
+    }
+  }, []);
+
+  const toggleLang = (newLang: keyof typeof translations) => {
+    setLang(newLang);
+    localStorage.setItem("lang", newLang);
+  };
+  
   useEffect(() => {
     if (isAuthenticated) {
       setLocation("/dashboard");
@@ -34,20 +49,21 @@ export default function Login() {
       try {
         await login(telegramUser);
         toast({
-          title: "Успішний вхід",
-          description: `Ласкаво просимо, ${telegramUser.first_name || telegramUser.username}!`,
+          title: lang === "UA" ? "Успішний вхід" : lang === "RU" ? "Успешный вход" : "Login Successful",
+          description: `Welcome, ${telegramUser.first_name || telegramUser.username}!`,
         });
         setLocation("/dashboard");
       } catch (err) {
         toast({
-          title: "Помилка входу",
-          description: "Не вдалося увійти через Telegram",
+          title: lang === "UA" ? "Помилка входу" : lang === "RU" ? "Ошибка входа" : "Login Error",
+          description: "Telegram auth failed",
           variant: "destructive",
         });
       }
     };
 
-    if (telegramRef.current && !telegramRef.current.hasChildNodes()) {
+    if (telegramRef.current) {
+      telegramRef.current.innerHTML = "";
       const script = document.createElement("script");
       script.src = "https://telegram.org/js/telegram-widget.js?22";
       script.setAttribute("data-telegram-login", "DARKSHAREN1_BOT");
@@ -62,12 +78,12 @@ export default function Login() {
     return () => {
       delete window.onTelegramAuth;
     };
-  }, [login, setLocation, toast]);
+  }, [login, setLocation, toast, lang]);
 
-  const features = [
-    { icon: Shield, title: "Повний захист", desc: "Аналіз загроз в реальному часі" },
-    { icon: Globe, title: "6+ модулів", desc: "IP, Wallet, Email, Phone, Domain, URL" },
-    { icon: Zap, title: "Миттєва перевірка", desc: "Результат за секунди" },
+  const featuresList = [
+    { icon: Shield, title: t.features.shield, desc: lang === "UA" ? "Аналіз загроз в реальному часі" : lang === "EN" ? "Real-time threat analysis" : "Анализ угроз в реальном времени" },
+    { icon: Globe, title: t.features.modules, desc: "IP, Wallet, Email, Phone, Domain, URL" },
+    { icon: Zap, title: t.features.instant, desc: lang === "UA" ? "Результат за секунди" : lang === "EN" ? "Result in seconds" : "Результат за секунды" },
   ];
 
   return (
@@ -85,12 +101,25 @@ export default function Login() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Link href="/">
-              <Button variant="ghost" className="mb-8" data-testid="button-back-home">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                На головну
-              </Button>
-            </Link>
+            <div className="flex justify-between items-center mb-8">
+              <Link href="/">
+                <Button variant="ghost" data-testid="button-back-home">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  {t.backHome}
+                </Button>
+              </Link>
+              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                {(["UA", "RU", "EN"] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => toggleLang(l)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded ${lang === l ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="flex items-center gap-3 mb-6">
               <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
@@ -103,17 +132,16 @@ export default function Login() {
             </div>
 
             <h2 className="text-4xl xl:text-5xl font-display font-bold mb-6 leading-tight">
-              Захистіть себе від{" "}
-              <span className="text-primary">кіберзагроз</span>
+              {lang === "UA" ? "Захистіть себе від " : lang === "RU" ? "Защитите себя от " : "Protect yourself from "}
+              <span className="text-primary">{lang === "UA" ? "кіберзагроз" : lang === "RU" ? "киберугроз" : "cyber threats"}</span>
             </h2>
             
             <p className="text-lg text-muted-foreground mb-10 max-w-lg">
-              Професійний інструмент для перевірки ризиків. Миттєвий аналіз IP-адрес, 
-              криптогаманців, email та інших цифрових об'єктів.
+              {t.heroDescription}
             </p>
 
             <div className="space-y-4">
-              {features.map((feature, idx) => (
+              {featuresList.map((feature, idx) => (
                 <motion.div
                   key={idx}
                   initial={{ opacity: 0, x: -20 }}
@@ -141,16 +169,23 @@ export default function Login() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="w-full max-w-md"
           >
-            <div className="lg:hidden mb-8">
+            <div className="lg:hidden flex justify-between items-center mb-8">
               <Link href="/">
-                <Button variant="ghost" className="mb-4" data-testid="button-back-home-mobile">
+                <Button variant="ghost" data-testid="button-back-home-mobile">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  На головну
+                  {t.backHome}
                 </Button>
               </Link>
-              <div className="flex items-center gap-3 mb-4">
-                <Shield className="w-8 h-8 text-primary" />
-                <span className="text-2xl font-display font-bold">DARKSHARE</span>
+              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                {(["UA", "RU", "EN"] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => toggleLang(l)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded ${lang === l ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"}`}
+                  >
+                    {l}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -159,92 +194,21 @@ export default function Login() {
                 <div className="mx-auto mb-4 w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
                   <Lock className="w-9 h-9 text-primary" />
                 </div>
-                <h2 className="text-2xl font-display font-bold">Вхід в акаунт</h2>
+                <h2 className="text-2xl font-display font-bold">{t.loginTitle}</h2>
                 <p className="text-muted-foreground text-sm mt-2">
-                  Авторизуйтесь через Telegram для доступу до панелі
+                  {t.loginSubtitle}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6 pb-8">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-transparent border border-primary/20">
-                    <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Єдиний акаунт</p>
-                      <p className="text-xs text-muted-foreground">
-                        Telegram бот + Web панель
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10">
-                    <div className="w-10 h-10 rounded-lg bg-white/10 dark:bg-white/10 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">15 безкоштовних перевірок</p>
-                      <p className="text-xs text-muted-foreground">
-                        Щодня оновлюється ліміт
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-white/10" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-3 text-muted-foreground">Авторизація</span>
-                  </div>
-                </div>
-
                 <div className="flex flex-col items-center gap-4">
                   <div 
                     ref={telegramRef} 
                     className="telegram-login-container"
                     data-testid="telegram-login-widget"
                   />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Натисніть кнопку для входу через Telegram
-                  </p>
-                </div>
-
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="text-security-tls">
-                    <CheckCircle className="w-4 h-4 text-primary" />
-                    <span>Безпечне з'єднання TLS 1.3</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="text-security-privacy">
-                    <CheckCircle className="w-4 h-4 text-primary" />
-                    <span>Дані не передаються третім особам</span>
-                  </div>
-                </div>
-
-                <div className="text-center pt-2 border-t border-white/10">
-                  <p className="text-xs text-muted-foreground">
-                    Ще не маєте акаунту?{" "}
-                    <a 
-                      href="https://t.me/DARKSHAREN1_BOT" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline font-medium"
-                      data-testid="link-telegram-bot"
-                    >
-                      Почніть з бота
-                    </a>
-                  </p>
                 </div>
               </CardContent>
             </Card>
-
-            <p className="text-center text-xs text-muted-foreground mt-6">
-              Входячи, ви погоджуєтесь з{" "}
-              <a href="#" className="text-primary cursor-pointer hover:underline" data-testid="link-terms">Умовами використання</a>
-              {" "}та{" "}
-              <a href="#" className="text-primary cursor-pointer hover:underline" data-testid="link-privacy">Політикою конфіденційності</a>
-            </p>
           </motion.div>
         </div>
       </div>
