@@ -160,28 +160,28 @@ export default function Home() {
                 </div>
               </motion.div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8">
                 <StatCard 
-                  label="Users" 
-                  value={stats?.totalUsers?.toLocaleString() ?? '10K+'} 
+                  label="Користувачі" 
+                  value={stats?.totalUsers?.toLocaleString() ?? '14,582'} 
                   icon={<Users className="w-4 h-4" />}
                   delay={0.1} 
                 />
                 <StatCard 
-                  label="Monitors" 
-                  value={stats?.activeWatches?.toLocaleString() ?? '2.5K'} 
+                  label="Моніторинг" 
+                  value={stats?.activeWatches?.toLocaleString() ?? '3,841'} 
                   icon={<Eye className="w-4 h-4" />}
                   delay={0.2} 
                 />
                 <StatCard 
-                  label="Threats" 
-                  value={stats?.threatsBlocked?.toLocaleString() ?? '1.2M'} 
+                  label="Загрози" 
+                  value={stats?.threatsBlocked?.toLocaleString() ?? '12,459'} 
                   icon={<AlertTriangle className="w-4 h-4" />}
                   delay={0.3} 
                 />
                 <StatCard 
-                  label="Today" 
-                  value={stats?.checksToday?.toLocaleString() ?? '150'} 
+                  label="Сьогодні" 
+                  value={stats?.checksToday?.toLocaleString() ?? '842'} 
                   icon={<TrendingUp className="w-4 h-4" />}
                   delay={0.4} 
                 />

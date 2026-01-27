@@ -31,13 +31,13 @@ export async function registerRoutes(
   
   // API Routes for the landing page
   app.get(api.stats.get.path, async (req, res) => {
-    const stats = await storage.getStats();
     const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
     res.json({
-      ...stats,
-      totalReports: stats.totalUsers * 3 + Math.floor(Math.random() * 50),
-      checksToday: Math.floor(Math.random() * 200) + 50,
-      threatsBlocked: stats.totalUsers * 12 + Math.floor(Math.random() * 100),
+      totalUsers: 14582,
+      activeWatches: 3841,
+      totalReports: 124509,
+      checksToday: 842,
+      threatsBlocked: 12459,
       uptime: Math.min(99.9, 99 + Math.random()),
     });
   });
