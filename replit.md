@@ -135,3 +135,29 @@ Preferred communication style: Simple, everyday language.
 
 ### Database Commands
 - `npm run db:push`: Push schema changes to database
+
+## Deployment on Replit
+
+### Web Application + Bot (Combined)
+The application runs both the web server (Express + Vite) and Telegram bot in a single process:
+- Use **Web Service** deployment type
+- The bot runs integrated with the web server
+- Default command: `npm run dev`
+
+### Deployment Steps
+1. Ensure `TELEGRAM_BOT_TOKEN` is set in Secrets
+2. Ensure `DATABASE_URL` is configured (use Replit PostgreSQL)
+3. Click "Deploy" or use the "Reserved VM" option for continuous operation
+4. For production, the bot uses long-polling (no webhook needed)
+
+### Reserved VM (Recommended for Bot)
+For 24/7 bot operation, use **Reserved VM Deployment**:
+- Provides dedicated computing resources
+- Bot runs continuously without interruption
+- Predictable costs and performance
+- Set application type to "Web" (since we serve both web and bot)
+
+### Environment Variables for Production
+- `DATABASE_URL`: PostgreSQL connection (automatically set by Replit)
+- `TELEGRAM_BOT_TOKEN`: Your bot token from @BotFather
+- `NODE_ENV`: Set to "production" for production builds
